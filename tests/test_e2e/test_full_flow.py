@@ -24,6 +24,8 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.const import (
+    CONF_BEMFA_SECRET_ID,
+    CONF_BEMFA_SECRET_KEY,
     CONF_BEMFA_UID,
     CONF_COOKIE,
     CONF_HOUSE_ID,
@@ -34,6 +36,8 @@ from custom_components.xiaodu.const import (
 from tests.conftest import load_json_fixture
 from tests.const import (
     TEST_APPLIANCE_ID,
+    TEST_BEMFA_SECRET_ID,
+    TEST_BEMFA_SECRET_KEY,
     TEST_BEMFA_UID,
     TEST_COOKIE,
     TEST_HOUSE_ID,
@@ -111,7 +115,12 @@ async def _run_config_flow_to_bemfa(
         result["flow_id"], ROOM_MAPPING
     )
     return await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_BEMFA_UID: bemfa_uid}
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: bemfa_uid,
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID if bemfa_uid else "",
+            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY if bemfa_uid else "",
+        },
     )
 
 
@@ -130,6 +139,8 @@ def _make_bemfa_config_entry(hass: HomeAssistant) -> MockConfigEntry:
             "bemfa": {
                 "enabled": True,
                 "uid": TEST_BEMFA_UID,
+                "secret_id": TEST_BEMFA_SECRET_ID,
+                "secret_key": TEST_BEMFA_SECRET_KEY,
                 "sync_devices": True,
             },
         },
@@ -232,9 +243,6 @@ async def test_scenario_2_polling_discovers_new_device(
     coordinator = entry.runtime_data
     initial_count = len(coordinator.data)
 
-    # Record mock call count before refresh
-    calls_before = len(aioclient_mock.mock_calls)
-
     # Trigger poll → returns device_list_added
     await coordinator.async_refresh()
     await hass.async_block_till_done()
@@ -248,9 +256,17 @@ async def test_scenario_2_polling_discovers_new_device(
     new_switch = hass.states.get("switch.test_switch_2")
     assert new_switch is not None
 
-    # Bemfa sync was triggered (HTTP calls were made to Bemfa endpoints)
-    calls_after = len(aioclient_mock.mock_calls)
-    assert calls_after > calls_before
+    # Bemfa sync was triggered: create_topic HTTP request was sent with the
+    # secretID/secretKey credentials (regression guard for requirement 5).
+    create_calls = [c for c in aioclient_mock.mock_calls if "createTopic" in str(c[1])]
+    assert len(create_calls) > 0
+    # mock_calls tuple is (method, url, data, headers); data holds the JSON body.
+    create_body = create_calls[0][2]
+    assert create_body is not None
+    assert "secretID" in create_body
+    assert "secretKey" in create_body
+    assert create_body["secretID"] == TEST_BEMFA_SECRET_ID
+    assert create_body["secretKey"] == TEST_BEMFA_SECRET_KEY
 
 
 # ---------------------------------------------------------------------------
@@ -288,24 +304,32 @@ async def test_scenario_3_polling_discovers_state_change(
     )
     assert initial_state == "OFF"
 
-    # Record mock call count before refresh
-    calls_before = len(aioclient_mock.mock_calls)
+    # Patch BemfaMQTTClient.publish to capture the state-change publish,
+    # then trigger poll → returns state_changed fixture (light_001 = ON).
+    with patch(
+        "custom_components.xiaodu.bemfa.mqtt_client.BemfaMQTTClient.publish"
+    ) as mock_publish:
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
 
-    # Trigger poll → returns state_changed fixture (light_001 = ON)
-    await coordinator.async_refresh()
-    await hass.async_block_till_done()
+        # Verify state was refreshed
+        new_state = (
+            coordinator.data["appliance_test_light_001"]
+            .state_setting.get("turnOnState", {})
+            .get("value")
+        )
+        assert new_state == "ON"
 
-    # Verify state was refreshed
-    new_state = (
-        coordinator.data["appliance_test_light_001"]
-        .state_setting.get("turnOnState", {})
-        .get("value")
-    )
-    assert new_state == "ON"
-
-    # Bemfa publish was triggered (HTTP calls were made to Bemfa endpoints)
-    calls_after = len(aioclient_mock.mock_calls)
-    assert calls_after > calls_before
+        # Bemfa state-change publish was triggered for light_001 with a
+        # payload carrying the new turnOnState (regression guard for the
+        # state-change → MQTT publish path).
+        publish_calls = [
+            c for c in mock_publish.call_args_list if c.args[0].endswith("/up")
+        ]
+        assert len(publish_calls) > 0
+        payload = publish_calls[0].args[1]
+        assert payload is not None
+        assert "turnOnState" in payload
 
 
 # ---------------------------------------------------------------------------
@@ -494,6 +518,10 @@ async def test_scenario_6_bemfa_mqtt_publish(
         topic = last_call.args[0]
         assert topic == "test_topic_002/up"
 
-        # Verify payload contains on=true
+        # Verify payload is non-empty and carries the device state (the
+        # turn_on optimistic update should set turnOnState). This is a
+        # regression guard for the HA-control → MQTT publish path.
         payload = last_call.args[1]
         assert payload is not None
+        assert isinstance(payload, dict)
+        assert "turnOnState" in payload

@@ -25,6 +25,8 @@ CONF_HOUSE_ID = "house_id"
 CONF_HOUSE_NAME = "house_name"
 CONF_ROOM_MAPPING = "room_mapping"
 CONF_BEMFA_UID = "bemfa_uid"
+CONF_BEMFA_SECRET_ID = "bemfa_secret_id"  # noqa: S105 - config key name
+CONF_BEMFA_SECRET_KEY = "bemfa_secret_key"  # noqa: S105 - config key name
 CONF_BEMFA_ENABLED = "bemfa_enabled"
 
 # 设备类型编码映射：xiaodu_type -> bemfa_topic_suffix（巴法云主题后缀）

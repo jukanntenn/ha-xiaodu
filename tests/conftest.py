@@ -26,6 +26,8 @@ from custom_components.xiaodu.const import (
     DOMAIN,
 )
 from tests.const import (
+    TEST_BEMFA_SECRET_ID,
+    TEST_BEMFA_SECRET_KEY,
     TEST_BEMFA_UID,
     TEST_COOKIE,
     TEST_HOUSE_ID,
@@ -80,6 +82,8 @@ def mock_config_entry_with_bemfa() -> MockConfigEntry:
             "bemfa": {
                 "enabled": True,
                 "uid": TEST_BEMFA_UID,
+                "secret_id": TEST_BEMFA_SECRET_ID,
+                "secret_key": TEST_BEMFA_SECRET_KEY,
                 "sync_devices": True,
             },
         },

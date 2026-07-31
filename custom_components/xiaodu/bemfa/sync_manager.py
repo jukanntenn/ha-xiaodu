@@ -31,6 +31,7 @@ class DeviceMapping:
     room_name: str = ""
     last_sync_time: float = field(default_factory=time.time)
     sync_status: str = "pending"
+    sync_error: str | None = None
 
 
 class BemfaDeviceSyncManager:
@@ -137,7 +138,7 @@ class BemfaDeviceSyncManager:
         mapped_room = room_mapping.get(device.room_name, device.room_name)
         nickname = self._generate_nickname(device, room_mapping)
 
-        success = await self._api_client.create_topic(topic, nickname)
+        success, error_msg = await self._api_client.create_topic(topic, nickname)
         if success:
             await self._api_client.change_topic_room([topic], mapped_room)
             await self._api_client.change_topic_group([topic], mapped_room)
@@ -154,6 +155,7 @@ class BemfaDeviceSyncManager:
             room_name=device.room_name,
             last_sync_time=time.time(),
             sync_status="synced" if success else "error",
+            sync_error=error_msg,
         )
         _LOGGER.info("Added Bemfa device: %s -> %s", device.appliance_id, topic)
 

@@ -10,12 +10,12 @@
             },
             "cookie": {
                 "title": "输入百度 Cookie",
-                "description": "输入百度 Cookie（BDUSS）以认证小度云端",
+                "description": "请登录百度控制台后，按以下步骤获取 BDUSS Cookie：\n1. 在浏览器中打开百度控制台并完成登录\n2. 按 F12 打开开发者工具，进入「应用程序 (Application)」→「Cookie」\n3. 找到名为 BDUSS 的条目，复制其值粘贴到下方\n\nBDUSS 有效期约 180 天，过期后需重新获取。该 Cookie 仅用于本集成访问你的设备，不会上传到第三方。",
                 "data": {
-                    "cookie": "百度 Cookie"
+                    "cookie": "BDUSS Cookie"
                 },
                 "data_description": {
-                    "cookie": "百度 BDUSS Cookie，有效期约 180 天"
+                    "cookie": "百度 BDUSS Cookie 的值（不含 BDUSS= 前缀）"
                 }
             },
             "home": {
@@ -47,13 +47,16 @@
             },
             "bemfa": {
                 "title": "巴法云配置",
-                "description": "配置巴法云同步（可选）",
+                "description": "通过巴法云，可使用智能音箱（如小爱同学）语音控制同步的设备。如不需要语音控制，可全部留空跳过。\n\n需先在巴法云完成实名认证，然后按以下步骤获取凭证：\n1. 登录巴法云控制台，进入「API 密钥」页面\n2. 复制用户私钥（UID）、secretID、secretKey，分别填入下方\n3. 三个字段需同时填写才能启用同步",
                 "data": {
-                    "bemfa_uid": "巴法云 UID",
-                    "sync_enabled": "启用设备同步"
+                    "bemfa_uid": "巴法云 UID（用户私钥）",
+                    "bemfa_secret_id": "secretID",
+                    "bemfa_secret_key": "secretKey"
                 },
                 "data_description": {
-                    "bemfa_uid": "巴法云私钥（UID），留空则跳过"
+                    "bemfa_uid": "巴法云控制台获取，用于标识你的账号",
+                    "bemfa_secret_id": "API 密钥对之一，需实名认证后获取",
+                    "bemfa_secret_key": "API 密钥对之一，需实名认证后获取"
                 }
             },
             "reauth_confirm": {
@@ -72,7 +75,8 @@
             "cannot_connect": "无法连接到小度云端",
             "auth_failed": "认证失败",
             "no_homes": "未找到家庭",
-            "no_devices": "未找到设备"
+            "no_devices": "未找到设备",
+            "bemfa_secret_required": "UID、secretID、secretKey 必须同时填写或同时留空"
         },
         "abort": {
             "already_configured": "已配置",
@@ -101,13 +105,16 @@
             },
             "bemfa": {
                 "title": "修改巴法云配置",
-                "description": "修改巴法云同步设置",
+                "description": "通过巴法云，可使用智能音箱（如小爱同学）语音控制同步的设备。如不需要语音控制，可全部留空跳过。\n\n需先在巴法云完成实名认证，然后按以下步骤获取凭证：\n1. 登录巴法云控制台，进入「API 密钥」页面\n2. 复制用户私钥（UID）、secretID、secretKey，分别填入下方\n3. 三个字段需同时填写才能启用同步",
                 "data": {
-                    "bemfa_uid": "巴法云 UID",
-                    "sync_enabled": "启用设备同步"
+                    "bemfa_uid": "巴法云 UID（用户私钥）",
+                    "bemfa_secret_id": "secretID",
+                    "bemfa_secret_key": "secretKey"
                 },
                 "data_description": {
-                    "bemfa_uid": "巴法云私钥（UID），留空则禁用"
+                    "bemfa_uid": "巴法云控制台获取，用于标识你的账号",
+                    "bemfa_secret_id": "API 密钥对之一，需实名认证后获取",
+                    "bemfa_secret_key": "API 密钥对之一，需实名认证后获取"
                 }
             },
             "reauth": {
@@ -124,7 +131,8 @@
         "error": {
             "invalid_cookie": "Cookie 格式无效",
             "cannot_connect": "无法连接到小度云端",
-            "auth_failed": "认证失败"
+            "auth_failed": "认证失败",
+            "bemfa_secret_required": "UID、secretID、secretKey 必须同时填写或同时留空"
         }
     }
 }

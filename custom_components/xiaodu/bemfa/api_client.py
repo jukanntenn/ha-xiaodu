@@ -21,15 +21,25 @@ _LOGGER = logging.getLogger(__name__)
 class BemfaAPIClient:
     """巴法云（Bemfa）的 HTTP API 客户端。"""
 
-    def __init__(self, bemfa_uid: str, session: ClientSession) -> None:
+    def __init__(
+        self,
+        bemfa_uid: str,
+        session: ClientSession,
+        secret_id: str = "",
+        secret_key: str = "",
+    ) -> None:
         """初始化 API 客户端。
 
         Args:
             bemfa_uid: 巴法云（Bemfa）的 UID。
             session: aiohttp 客户端会话。
+            secret_id: 巴法云 API 密钥对之 secretID（v2 接口创建/删除 topic 必填）。
+            secret_key: 巴法云 API 密钥对之 secretKey（v2 接口创建/删除 topic 必填）。
         """
-        self._bemfa_uid = bemfa_uid
-        self._session = session
+        self._bemfa_uid: str = bemfa_uid
+        self._session: ClientSession = session
+        self._secret_id: str = secret_id
+        self._secret_key: str = secret_key
 
     async def _request(
         self,
@@ -62,7 +72,7 @@ class BemfaAPIClient:
             _LOGGER.warning("Bemfa API response error: %s", err)
             return None
 
-    async def create_topic(self, topic: str, name: str) -> bool:
+    async def create_topic(self, topic: str, name: str) -> tuple[bool, str | None]:
         """在巴法云上创建一个 topic（主题）。
 
         Args:
@@ -70,7 +80,8 @@ class BemfaAPIClient:
             name: 设备昵称。
 
         Returns:
-            成功返回 True。
+            (success, error_msg)：成功时 error_msg 为 None；
+            40006（设备已存在）视为成功。
         """
         data = await self._request(
             "post",
@@ -80,15 +91,20 @@ class BemfaAPIClient:
                 "topic": topic,
                 "type": 1,
                 "name": name,
+                "secretID": self._secret_id,
+                "secretKey": self._secret_key,
             },
         )
         if not data:
-            return False
-        if data.get("code") == 0:
-            _LOGGER.debug("Created Bemfa topic: %s", topic)
-            return True
-        _LOGGER.warning("Failed to create Bemfa topic %s: %s", topic, data.get("msg"))
-        return False
+            return False, "无响应或请求异常"
+        code = data.get("code")
+        # code==0 成功；40006 设备已存在也视为成功
+        if code in (0, 40006):
+            _LOGGER.debug("Created Bemfa topic: %s (code=%s)", topic, code)
+            return True, None
+        msg = str(data.get("msg") or f"code={code}")
+        _LOGGER.warning("Failed to create Bemfa topic %s: %s", topic, msg)
+        return False, msg
 
     async def delete_topic(self, topic: str) -> bool:
         """从巴法云删除一个 topic（主题）。

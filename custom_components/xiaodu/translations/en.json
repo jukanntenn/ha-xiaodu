@@ -10,12 +10,12 @@
             },
             "cookie": {
                 "title": "Enter Baidu Cookie",
-                "description": "Enter your Baidu Cookie (BDUSS) to authenticate with Xiaodu cloud",
+                "description": "Obtain your BDUSS cookie as follows:\n1. Open the Baidu console in your browser and sign in\n2. Press F12 to open DevTools, go to Application (应用) → Cookies\n3. Find the entry named BDUSS and copy its value below\n\nThe BDUSS cookie is valid for about 180 days. It is only used to access your devices and is never uploaded to any third party.",
                 "data": {
-                    "cookie": "Baidu Cookie"
+                    "cookie": "BDUSS Cookie"
                 },
                 "data_description": {
-                    "cookie": "Your Baidu BDUSS cookie, valid for about 180 days"
+                    "cookie": "The value of the BDUSS cookie (without the 'BDUSS=' prefix)"
                 }
             },
             "home": {
@@ -47,13 +47,16 @@
             },
             "bemfa": {
                 "title": "Bemfa Cloud Configuration",
-                "description": "Configure Bemfa Cloud synchronization (optional)",
+                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Leave all fields empty to skip.\n\nObtain your credentials after completing identity verification on Bemfa Cloud:\n1. Log in to Bemfa Cloud console, open the \"API Key\" page\n2. Copy your private key (UID), secretID, and secretKey\n3. All three fields must be filled together to enable sync",
                 "data": {
-                    "bemfa_uid": "Bemfa UID",
-                    "sync_enabled": "Enable Device Sync"
+                    "bemfa_uid": "Bemfa UID (Private Key)",
+                    "bemfa_secret_id": "secretID",
+                    "bemfa_secret_key": "secretKey"
                 },
                 "data_description": {
-                    "bemfa_uid": "Your Bemfa Cloud private key (UID), leave empty to skip"
+                    "bemfa_uid": "Your Bemfa account private key",
+                    "bemfa_secret_id": "API key pair, requires identity verification",
+                    "bemfa_secret_key": "API key pair, requires identity verification"
                 }
             },
             "reauth_confirm": {
@@ -72,7 +75,8 @@
             "cannot_connect": "Cannot connect to Xiaodu cloud",
             "auth_failed": "Authentication failed",
             "no_homes": "No homes found",
-            "no_devices": "No devices found"
+            "no_devices": "No devices found",
+            "bemfa_secret_required": "UID, secretID and secretKey must all be filled or all empty"
         },
         "abort": {
             "already_configured": "Already configured",
@@ -101,13 +105,16 @@
             },
             "bemfa": {
                 "title": "Modify Bemfa Configuration",
-                "description": "Modify Bemfa Cloud synchronization settings",
+                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Leave all fields empty to skip.\n\nObtain your credentials after completing identity verification on Bemfa Cloud:\n1. Log in to Bemfa Cloud console, open the \"API Key\" page\n2. Copy your private key (UID), secretID, and secretKey\n3. All three fields must be filled together to enable sync",
                 "data": {
-                    "bemfa_uid": "Bemfa UID",
-                    "sync_enabled": "Enable Device Sync"
+                    "bemfa_uid": "Bemfa UID (Private Key)",
+                    "bemfa_secret_id": "secretID",
+                    "bemfa_secret_key": "secretKey"
                 },
                 "data_description": {
-                    "bemfa_uid": "Your Bemfa Cloud private key (UID), leave empty to disable"
+                    "bemfa_uid": "Your Bemfa account private key",
+                    "bemfa_secret_id": "API key pair, requires identity verification",
+                    "bemfa_secret_key": "API key pair, requires identity verification"
                 }
             },
             "reauth": {
@@ -124,7 +131,8 @@
         "error": {
             "invalid_cookie": "Invalid Cookie format",
             "cannot_connect": "Cannot connect to Xiaodu cloud",
-            "auth_failed": "Authentication failed"
+            "auth_failed": "Authentication failed",
+            "bemfa_secret_required": "UID, secretID and secretKey must all be filled or all empty"
         }
     }
 }

@@ -1,5 +1,1 @@
-{
-  "code": 40000,
-  "message": "Unknown error",
-  "data": null
-}
+{"code": 0, "message": "OK", "data": 0}

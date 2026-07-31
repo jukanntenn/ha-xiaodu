@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -44,11 +45,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # 如已启用，则创建 Bemfa（巴法云）相关组件
     bemfa_sync_manager: BemfaDeviceSyncManager | None = None
-    bemfa_config = entry.options.get("bemfa", {})
+    bemfa_config: dict[str, Any] = entry.options.get("bemfa", {})
     if bemfa_config.get("enabled"):
         bemfa_uid = bemfa_config.get("uid", "")
         if bemfa_uid:
-            bemfa_api = BemfaAPIClient(bemfa_uid, session)
+            secret_id = str(bemfa_config.get("secret_id", ""))
+            secret_key = str(bemfa_config.get("secret_key", ""))
+            bemfa_api = BemfaAPIClient(
+                bemfa_uid,
+                session,
+                secret_id=secret_id,
+                secret_key=secret_key,
+            )
             bemfa_mqtt = BemfaMQTTClient(bemfa_uid)
             bemfa_publisher = BemfaStatePublisher(bemfa_mqtt)
             bemfa_sync_manager = BemfaDeviceSyncManager(

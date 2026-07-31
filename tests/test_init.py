@@ -59,6 +59,12 @@ async def test_setup_entry_with_bemfa(
 
     assert mock_config_entry_with_bemfa.state is ConfigEntryState.LOADED
 
+    # Verify secret credentials are passed to the Bemfa API client (step 3.6.6)
+    coordinator = mock_config_entry_with_bemfa.runtime_data
+    api_client = coordinator.bemfa_sync_manager._api_client
+    assert api_client._secret_id == "test_secret_id_abcdefghijklmnop"  # noqa: S105
+    assert api_client._secret_key == "test_secret_key_qrstuvwxyz123456"  # noqa: S105
+
 
 async def test_unload_with_bemfa_cleans_up_topics(
     hass: HomeAssistant,
