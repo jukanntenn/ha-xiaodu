@@ -18,6 +18,8 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.const import (
+    CONF_BEMFA_SECRET_ID,
+    CONF_BEMFA_SECRET_KEY,
     CONF_BEMFA_UID,
     CONF_COOKIE,
     CONF_HOUSE_ID,
@@ -27,6 +29,8 @@ from custom_components.xiaodu.const import (
 from tests.conftest import load_json_fixture
 from tests.const import (
     TEST_APPLIANCE_ID,
+    TEST_BEMFA_SECRET_ID,
+    TEST_BEMFA_SECRET_KEY,
     TEST_BEMFA_UID,
     TEST_COOKIE,
     TEST_HOUSE_ID,
@@ -296,11 +300,18 @@ async def test_full_flow_with_bemfa(
     )
 
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_BEMFA_UID: TEST_BEMFA_UID}
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: TEST_BEMFA_UID,
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
+            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY,
+        },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["options"]["bemfa"]["enabled"] is True
     assert result["options"]["bemfa"]["uid"] == TEST_BEMFA_UID
+    assert result["options"]["bemfa"]["secret_id"] == TEST_BEMFA_SECRET_ID
+    assert result["options"]["bemfa"]["secret_key"] == TEST_BEMFA_SECRET_KEY
 
 
 async def test_unique_id_already_configured(
@@ -510,11 +521,18 @@ async def test_options_flow_bemfa_enable(
     assert result["step_id"] == "bemfa"
 
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_BEMFA_UID: TEST_BEMFA_UID}
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: TEST_BEMFA_UID,
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
+            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY,
+        },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"]["bemfa"]["enabled"] is True
     assert result["data"]["bemfa"]["uid"] == TEST_BEMFA_UID
+    assert result["data"]["bemfa"]["secret_id"] == TEST_BEMFA_SECRET_ID
+    assert result["data"]["bemfa"]["secret_key"] == TEST_BEMFA_SECRET_KEY
     assert result["data"][CONF_ROOM_MAPPING] == _room_mapping_form_data()
 
 
@@ -533,7 +551,12 @@ async def test_options_flow_bemfa_disable(
         result["flow_id"], {"next_step_id": "bemfa"}
     )
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_BEMFA_UID: ""}
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: "",
+            CONF_BEMFA_SECRET_ID: "",
+            CONF_BEMFA_SECRET_KEY: "",
+        },
     )
     assert result["type"] == FlowResultType.CREATE_ENTRY
     assert result["data"]["bemfa"]["enabled"] is False
@@ -608,3 +631,183 @@ async def test_options_flow_reauth_auth_failure(
     )
     assert result["type"] == FlowResultType.FORM
     assert result["errors"]["base"] == "auth_failed"
+
+
+# ---------------------------------------------------------------------------
+# ConfigFlow: device label + default selection
+# ---------------------------------------------------------------------------
+
+
+async def test_device_selection_defaults_to_all_selected(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """设备选择步骤默认勾选全部设备。
+
+    验证：用户不主动选择设备时（提交空值），schema 的 default
+    会自动填充全部设备 id 并推进到下一步。
+    """
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "device"
+    # 提交空值（不传 device_ids），schema 的 default 会自动填充
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    # 使用默认值应能推进到 room_mapping
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "room_mapping"
+
+
+async def test_device_label_no_empty_parens_when_no_room(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """roomName 为空时，设备标签不出现空括号。
+
+    直接单元测试 _device_label 方法，验证 label 生成逻辑。
+    """
+    from custom_components.xiaodu.api.xiaodu_types import Device
+    from custom_components.xiaodu.config_flow import XiaoduConfigFlow
+
+    # room_name 为空 → 不应出现 "()"
+    d_no_room = Device(
+        appliance_id="appliance_no_room_002",
+        friendly_name="新风系统",
+        room_name="",
+        appliance_types=["LIGHT"],
+        state_setting={},
+    )
+    label = XiaoduConfigFlow._device_label(d_no_room)
+    assert label == "新风系统"
+    assert "()" not in label
+
+    # room_name 非空 → 应拼括号
+    d_with_room = Device(
+        appliance_id="appliance_with_room",
+        friendly_name="客厅空调",
+        room_name="客厅",
+        appliance_types=["AIR_CONDITION"],
+        state_setting={},
+    )
+    label = XiaoduConfigFlow._device_label(d_with_room)
+    assert label == "客厅空调 (客厅)"
+
+    # friendly_name 为空 → 兜底到 appliance_id
+    d_no_name = Device(
+        appliance_id="appliance_no_name",
+        friendly_name="",
+        room_name="",
+        appliance_types=["LIGHT"],
+        state_setting={},
+    )
+    label = XiaoduConfigFlow._device_label(d_no_name)
+    assert label == "appliance_no_name"
+
+
+# ---------------------------------------------------------------------------
+# ConfigFlow: room_mapping skip when no rooms
+# ---------------------------------------------------------------------------
+
+
+async def test_room_mapping_skipped_when_no_rooms(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """所选设备均未分配房间时，跳过 room_mapping 直接进入 bemfa。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    # 所有设备 roomName 为空
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/appliance",
+        json={
+            "status": 0,
+            "data": {
+                "appliances": [
+                    {
+                        "applianceTypes": ["LIGHT"],
+                        "applianceId": "appliance_no_room_001",
+                        "roomName": "",
+                        "friendlyName": "No Room Light",
+                        "stateSetting": {},
+                    }
+                ]
+            },
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    # 选了无房间设备
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": ["appliance_no_room_001"]}
+    )
+    # 应直接进入 bemfa，跳过 room_mapping
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "bemfa"
+
+
+# ---------------------------------------------------------------------------
+# ConfigFlow: bemfa partial credentials rejected
+# ---------------------------------------------------------------------------
+
+
+async def test_bemfa_partial_credentials_rejected(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """UID 填了但 secret 没填 → 报错 bemfa_secret_required。"""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": [TEST_APPLIANCE_ID]}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], _room_mapping_form_data()
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: TEST_BEMFA_UID,
+            CONF_BEMFA_SECRET_ID: "",
+            CONF_BEMFA_SECRET_KEY: "",
+        },
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "bemfa"
+    assert result["errors"]["base"] == "bemfa_secret_required"

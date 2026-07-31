@@ -232,7 +232,9 @@ class XiaoduAPI:
             Device(
                 appliance_id=app["applianceId"],
                 friendly_name=app.get("friendlyName", ""),
-                room_name=app.get("room", ""),
+                room_name=app.get("roomName", "")
+                or app.get("room", "")
+                or app.get("groupName", ""),
                 appliance_types=app.get("applianceTypes", []),
                 state_setting=app.get("stateSetting", {}),
                 bot_name=app.get("botName"),
@@ -268,7 +270,9 @@ class XiaoduAPI:
         return DeviceDetail(
             appliance_id=appliance.get("applianceId", appliance_id),
             friendly_name=appliance.get("friendlyName", ""),
-            room_name=appliance.get("room", ""),
+            room_name=appliance.get("roomName", "")
+            or appliance.get("room", "")
+            or appliance.get("groupName", ""),
             appliance_types=appliance.get("applianceTypes", []),
             state_setting=appliance.get("stateSetting", {}),
             bot_name=appliance.get("botName"),

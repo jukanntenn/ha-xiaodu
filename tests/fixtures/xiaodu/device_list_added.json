@@ -9,7 +9,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_001",
-        "room": "次卧",
+        "roomName": "次卧",
         "friendlyName": "Test Light 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -40,7 +40,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_002",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 2",
         "botName": "test_bot",
         "stateSetting": {
@@ -71,7 +71,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_003",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 3",
         "botName": "test_bot",
         "stateSetting": {
@@ -102,7 +102,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_004",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 4",
         "botName": "test_bot",
         "stateSetting": {
@@ -133,7 +133,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_005",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 5",
         "botName": "test_bot",
         "stateSetting": {
@@ -164,7 +164,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_006",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 6",
         "botName": "test_bot",
         "stateSetting": {
@@ -195,7 +195,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_007",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Light 7",
         "botName": "test_bot",
         "stateSetting": {
@@ -226,7 +226,7 @@
           "AIR_CONDITION"
         ],
         "applianceId": "appliance_test_air_condition_001",
-        "room": "主卧",
+        "roomName": "主卧",
         "friendlyName": "Test Air Condition 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -275,7 +275,7 @@
           "AIR_CONDITION"
         ],
         "applianceId": "appliance_test_air_condition_002",
-        "room": "次卧",
+        "roomName": "次卧",
         "friendlyName": "Test Air Condition 2",
         "botName": "test_bot",
         "stateSetting": {
@@ -324,7 +324,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_008",
-        "room": "儿童房",
+        "roomName": "儿童房",
         "friendlyName": "Test Light 8",
         "botName": "test_bot",
         "stateSetting": {
@@ -355,7 +355,7 @@
           "AIR_CONDITION"
         ],
         "applianceId": "appliance_test_air_condition_003",
-        "room": "儿童房",
+        "roomName": "儿童房",
         "friendlyName": "Test Air Condition 3",
         "botName": "test_bot",
         "stateSetting": {
@@ -404,7 +404,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_009",
-        "room": "公卫",
+        "roomName": "公卫",
         "friendlyName": "Test Light 9",
         "botName": "test_bot",
         "stateSetting": {
@@ -435,7 +435,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_010",
-        "room": "公卫",
+        "roomName": "公卫",
         "friendlyName": "Test Light 10",
         "botName": "test_bot",
         "stateSetting": {
@@ -466,7 +466,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_011",
-        "room": "公卫",
+        "roomName": "公卫",
         "friendlyName": "Test Light 11",
         "botName": "test_bot",
         "stateSetting": {
@@ -497,7 +497,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_012",
-        "room": "公卫",
+        "roomName": "公卫",
         "friendlyName": "Test Light 12",
         "botName": "test_bot",
         "stateSetting": {
@@ -528,7 +528,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_013",
-        "room": "书房",
+        "roomName": "书房",
         "friendlyName": "Test Light 13",
         "botName": "test_bot",
         "stateSetting": {
@@ -559,7 +559,7 @@
           "AIR_CONDITION"
         ],
         "applianceId": "appliance_test_air_condition_004",
-        "room": "书房",
+        "roomName": "书房",
         "friendlyName": "Test Air Condition 4",
         "botName": "test_bot",
         "stateSetting": {
@@ -608,7 +608,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_014",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Light 14",
         "botName": "test_bot",
         "stateSetting": {
@@ -639,7 +639,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_015",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Light 15",
         "botName": "test_bot",
         "stateSetting": {
@@ -670,7 +670,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_016",
-        "room": "厨房",
+        "roomName": "厨房",
         "friendlyName": "Test Light 16",
         "botName": "test_bot",
         "stateSetting": {
@@ -701,7 +701,7 @@
           "AIR_CONDITION"
         ],
         "applianceId": "appliance_test_air_condition_005",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Air Condition 5",
         "botName": "test_bot",
         "stateSetting": {
@@ -750,7 +750,7 @@
           "HEATER"
         ],
         "applianceId": "appliance_test_heater_001",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Heater 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -784,7 +784,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_017",
-        "room": "餐厅",
+        "roomName": "餐厅",
         "friendlyName": "Test Light 17",
         "botName": "test_bot",
         "stateSetting": {
@@ -815,7 +815,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_018",
-        "room": "餐厅",
+        "roomName": "餐厅",
         "friendlyName": "Test Light 18",
         "botName": "test_bot",
         "stateSetting": {
@@ -846,7 +846,7 @@
           "LIGHT"
         ],
         "applianceId": "appliance_test_light_019",
-        "room": "餐厅",
+        "roomName": "餐厅",
         "friendlyName": "Test Light 19",
         "botName": "test_bot",
         "stateSetting": {
@@ -877,7 +877,7 @@
           "AIR_FRESHER"
         ],
         "applianceId": "appliance_test_air_fresher_001",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Air Fresher 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -899,7 +899,7 @@
           "SOCKET"
         ],
         "applianceId": "appliance_test_socket_001",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Socket 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -921,7 +921,7 @@
           "SWITCH"
         ],
         "applianceId": "appliance_test_switch_001",
-        "room": "卧室",
+        "roomName": "卧室",
         "friendlyName": "Test Switch 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -943,7 +943,7 @@
           "CURTAIN"
         ],
         "applianceId": "appliance_test_curtain_001",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Curtain 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -976,7 +976,7 @@
           "DOOR_LOCK"
         ],
         "applianceId": "appliance_test_door_lock_001",
-        "room": "大门",
+        "roomName": "大门",
         "friendlyName": "Test Door Lock 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -998,7 +998,7 @@
           "CLOTHES_RACK"
         ],
         "applianceId": "appliance_test_clothes_rack_001",
-        "room": "阳台",
+        "roomName": "阳台",
         "friendlyName": "Test Clothes Rack 1",
         "botName": "test_bot",
         "stateSetting": {
@@ -1020,7 +1020,7 @@
           "SWITCH"
         ],
         "applianceId": "appliance_test_switch_002",
-        "room": "客厅",
+        "roomName": "客厅",
         "friendlyName": "Test Switch 2",
         "botName": "test_bot",
         "stateSetting": {

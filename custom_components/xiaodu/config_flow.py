@@ -20,6 +20,8 @@ from .api.exceptions import XiaoduApiError, XiaoduAuthError, XiaoduNetworkError
 from .api.xiaodu_client import XiaoduAPI
 from .api.xiaodu_types import Device
 from .const import (
+    CONF_BEMFA_SECRET_ID,
+    CONF_BEMFA_SECRET_KEY,
     CONF_BEMFA_UID,
     CONF_COOKIE,
     CONF_HOUSE_ID,
@@ -157,13 +159,14 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         options = [
             SelectOptionDict(
                 value=d.appliance_id,
-                label=f"{d.friendly_name} ({d.room_name})",
+                label=self._device_label(d),
             )
             for d in self._devices
         ]
+        default_ids = [d.appliance_id for d in self._devices]
         return vol.Schema(
             {
-                vol.Required("device_ids"): SelectSelector(
+                vol.Optional("device_ids", default=default_ids): SelectSelector(
                     SelectSelectorConfig(
                         options=options,
                         mode=SelectSelectorMode.LIST,
@@ -172,6 +175,18 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             }
         )
+
+    @staticmethod
+    def _device_label(d: Device) -> str:
+        """生成设备在列表中的显示标签。
+
+        room_name 非空时拼括号显示房间，否则只显示设备名；
+        friendly_name 为空时兜底到 appliance_id。
+        """
+        name = d.friendly_name or d.appliance_id
+        if d.room_name:
+            return f"{name} ({d.room_name})"
+        return name
 
     async def async_step_room_mapping(
         self, user_input: dict[str, Any] | None = None
@@ -185,6 +200,11 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         # 自动匹配房间
         xiaodu_rooms = list({d.room_name for d in self._devices if d.room_name})
+        if not xiaodu_rooms:
+            # 所选设备均未分配房间——无需映射，跳过本步
+            self._room_mapping = {}
+            return await self.async_step_bemfa()
+
         # 获取 HA 区域（areas）
         from homeassistant.helpers import area_registry
 
@@ -199,7 +219,7 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         for xiaodu_room, mapped_area in auto_mapping.items():
             area_options = [*ha_areas, xiaodu_room]
             schema_fields[vol.Optional(xiaodu_room, default=mapped_area)] = vol.In(
-                list(set(area_options))
+                sorted(set(area_options))
             )
 
         return self.async_show_form(
@@ -211,56 +231,71 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """处理 Bemfa（巴法云）配置（可选）。"""
+        errors: dict[str, str] = {}
         if user_input is not None:
             bemfa_uid = user_input.get(CONF_BEMFA_UID, "").strip()
+            secret_id = user_input.get(CONF_BEMFA_SECRET_ID, "").strip()
+            secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
             bemfa_enabled = bool(bemfa_uid)
 
-            # 校验唯一性
-            await self.async_set_unique_id(f"xiaodu_{self._house_id}")
-            self._abort_if_unique_id_configured()
+            # 校验：三字段必须同填或同空（uid 填了，secret 也必须填）
+            if bemfa_enabled and not (secret_id and secret_key):
+                errors["base"] = "bemfa_secret_required"
+            if not bemfa_enabled and (secret_id or secret_key):
+                errors["base"] = "bemfa_secret_required"
 
-            # 序列化设备数据，用于写入配置条目（config entry）
-            serialized_devices = [
-                {
-                    "applianceId": d.appliance_id,
-                    "houseId": self._house_id,
-                    "cookie": self._cookie,
+            if not errors:
+                # 校验唯一性
+                await self.async_set_unique_id(f"xiaodu_{self._house_id}")
+                self._abort_if_unique_id_configured()
+
+                # 序列化设备数据，用于写入配置条目（config entry）
+                serialized_devices = [
+                    {
+                        "applianceId": d.appliance_id,
+                        "houseId": self._house_id,
+                        "cookie": self._cookie,
+                    }
+                    for d in self._devices
+                ]
+                appliance_types_list = [
+                    {"applianceTypes": d.appliance_types} for d in self._devices
+                ]
+
+                options: dict[str, Any] = {
+                    CONF_ROOM_MAPPING: self._room_mapping,
                 }
-                for d in self._devices
-            ]
-            appliance_types_list = [
-                {"applianceTypes": d.appliance_types} for d in self._devices
-            ]
+                if bemfa_enabled:
+                    options["bemfa"] = {
+                        "enabled": True,
+                        "uid": bemfa_uid,
+                        "secret_id": secret_id,
+                        "secret_key": secret_key,
+                        "sync_devices": True,
+                    }
 
-            options: dict[str, Any] = {
-                CONF_ROOM_MAPPING: self._room_mapping,
-            }
-            if bemfa_enabled:
-                options["bemfa"] = {
-                    "enabled": True,
-                    "uid": bemfa_uid,
-                    "sync_devices": True,
-                }
-
-            return self.async_create_entry(
-                title=f"Xiaodu: {self._house_name}",
-                data={
-                    CONF_COOKIE: self._cookie,
-                    CONF_HOUSE_ID: self._house_id,
-                    CONF_HOUSE_NAME: self._house_name,
-                    "devices": serialized_devices,
-                    "appliance_types": appliance_types_list,
-                },
-                options=options,
-            )
+                return self.async_create_entry(
+                    title=f"Xiaodu: {self._house_name}",
+                    data={
+                        CONF_COOKIE: self._cookie,
+                        CONF_HOUSE_ID: self._house_id,
+                        CONF_HOUSE_NAME: self._house_name,
+                        "devices": serialized_devices,
+                        "appliance_types": appliance_types_list,
+                    },
+                    options=options,
+                )
 
         return self.async_show_form(
             step_id="bemfa",
             data_schema=vol.Schema(
                 {
                     vol.Optional(CONF_BEMFA_UID, default=""): str,
+                    vol.Optional(CONF_BEMFA_SECRET_ID, default=""): str,
+                    vol.Optional(CONF_BEMFA_SECRET_KEY, default=""): str,
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_reauth(
@@ -342,7 +377,7 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
         schema_fields: dict = {}
         for xiaodu_room, mapped_area in current_mapping.items():
             schema_fields[vol.Optional(xiaodu_room, default=mapped_area)] = vol.In(
-                [*ha_areas, xiaodu_room]
+                sorted({*ha_areas, xiaodu_room})
             )
 
         return self.async_show_form(
@@ -354,27 +389,50 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> config_entries.ConfigFlowResult:
         """处理 Bemfa（巴法云）配置的修改。"""
+        errors: dict[str, str] = {}
+        current_bemfa = self.config_entry.options.get("bemfa", {})
+        current_secret_id = current_bemfa.get("secret_id", "")
+        current_secret_key = current_bemfa.get("secret_key", "")
+
         if user_input is not None:
             bemfa_uid = user_input.get(CONF_BEMFA_UID, "").strip()
-            options = {
-                **self.config_entry.options,
-                "bemfa": {
-                    "enabled": bool(bemfa_uid),
-                    "uid": bemfa_uid,
-                    "sync_devices": True,
-                },
-            }
-            return self.async_create_entry(title="", data=options)
+            secret_id = user_input.get(CONF_BEMFA_SECRET_ID, "").strip()
+            secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
+            bemfa_enabled = bool(bemfa_uid)
 
-        current_bemfa = self.config_entry.options.get("bemfa", {})
-        current_uid = current_bemfa.get("uid", "")
+            # 校验：三字段必须同填或同空
+            if bemfa_enabled and not (secret_id and secret_key):
+                errors["base"] = "bemfa_secret_required"
+            if not bemfa_enabled and (secret_id or secret_key):
+                errors["base"] = "bemfa_secret_required"
+
+            if not errors:
+                options = {
+                    **self.config_entry.options,
+                    "bemfa": {
+                        "enabled": bemfa_enabled,
+                        "uid": bemfa_uid,
+                        "secret_id": secret_id,
+                        "secret_key": secret_key,
+                        "sync_devices": True,
+                    },
+                }
+                return self.async_create_entry(title="", data=options)
+
         return self.async_show_form(
             step_id="bemfa",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_BEMFA_UID, default=current_uid): str,
+                    vol.Optional(
+                        CONF_BEMFA_UID, default=current_bemfa.get("uid", "")
+                    ): str,
+                    vol.Optional(CONF_BEMFA_SECRET_ID, default=current_secret_id): str,
+                    vol.Optional(
+                        CONF_BEMFA_SECRET_KEY, default=current_secret_key
+                    ): str,
                 }
             ),
+            errors=errors,
         )
 
     async def async_step_reauth(
