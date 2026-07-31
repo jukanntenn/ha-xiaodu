@@ -5,6 +5,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # pytest-aiohttp >= 1.1.1 要求 Python >= 3.14.2，与项目 requires-python >= 3.13 冲突
+      - dependency-name: "pytest-aiohttp"
+        versions: [">=1.1.1"]
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

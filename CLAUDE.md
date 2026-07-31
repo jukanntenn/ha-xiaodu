@@ -54,7 +54,6 @@ prek update                          # 升级钩子版本（遵循 cooldown_days
 - 必须使用 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`ci:`、`chore:`。
 - Release Drafter 的自动标签器会把 commit 前缀映射到 changelog 分区——禁止手动打 PR 标签。
 - PR 标题不应包含 Conventional Commit 前缀（保持 release notes 整洁）。
-- 避免直接推送到 `main`——`prek.toml` 对 `main` 分支启用了 `no-commit-to-branch` 保护。
 
 ## AI Agent 钩子
 
