@@ -48,6 +48,7 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 4. 选择设备：勾选需要同步到 Home Assistant 的设备
 5. 房间映射：确认小度房间到 Home Assistant 区域的映射关系
 6. 巴法云配置（可选）：填入巴法云 UID 并启用同步，留空则跳过
+7. 配置完成后，Home Assistant 会自动弹出「命名和分配」（Name and assign）对话框，这是 HA 的标准流程，可在其中调整设备名称和分配区域，无需操作可直接关闭
 
 ### 重新认证
 
@@ -91,6 +92,19 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 - 确认设备类型在支持列表中（见「支持的设备」）
 - 通过诊断信息导出查看设备原始数据
 - 若为新设备类型，可提交 Issue 反馈
+
+## 诊断与日志 / Diagnostics & Logging
+
+提交 Issue 或排查问题时，请附上 debug 日志和诊断信息：
+
+1. 进入「设置 → 设备与服务 → Xiaodu」集成卡片
+2. 点击右上角三点菜单 → **启用调试日志（Enable debug logging）**
+3. 复现问题（如控制设备、触发巴法云同步）
+4. 再次点击三点菜单 → **禁用调试日志（Disable debug logging）**，系统会提示下载日志文件
+5. 点击三点菜单 → **下载诊断信息（Download diagnostics）**，下载诊断 JSON 文件
+6. 将上述两个文件附到 Issue 中
+
+> 诊断 JSON 已自动对 Cookie、巴法云 secretID/secretKey 等敏感字段脱敏（显示为 `**REDACTED**`），可放心附上。
 
 ## 参与贡献
 
