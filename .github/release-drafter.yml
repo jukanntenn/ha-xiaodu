@@ -1,0 +1,47 @@
+categories:
+  - title: ":boom: Breaking Changes"
+    label: "breaking"
+  - title: ":rocket: Features"
+    label: "enhancement"
+  - title: ":beetle: Fixes"
+    label: "bug"
+  - title: ":rotating_light: Testing"
+    label: "testing"
+  - title: ":construction_worker: Continuous Integration"
+    label: "ci"
+  - title: ":books: Documentation"
+    label: "documentation"
+  - title: ":hammer: Refactoring"
+    label: "refactoring"
+  - title: ":package: Dependencies"
+    labels:
+      - "dependencies"
+      - "build"
+
+autolabeler:
+  - label: "breaking"
+    title:
+      - "/^(feat|fix|refactor)!:/"
+  - label: "enhancement"
+    title:
+      - "/^feat:/"
+  - label: "bug"
+    title:
+      - "/^fix:/"
+  - label: "testing"
+    title:
+      - "/^test:/"
+  - label: "ci"
+    title:
+      - "/^ci:/"
+  - label: "documentation"
+    title:
+      - "/^docs:/"
+  - label: "refactoring"
+    title:
+      - "/^refactor:/"
+
+template: |
+  ## Changes
+
+  $CHANGES

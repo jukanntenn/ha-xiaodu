@@ -1,0 +1,25 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "Edit|Write|MultiEdit",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/post-edit-format.py"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "python ${CLAUDE_PROJECT_DIR}/.claude/hooks/stop-lint.py"
+                    }
+                ]
+            }
+        ]
+    }
+}

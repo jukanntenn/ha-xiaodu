@@ -1,0 +1,56 @@
+{
+  "status": 0,
+  "msg": "ok",
+  "data": {
+    "appliance": {
+      "applianceTypes": [
+        "AIR_CONDITION"
+      ],
+      "applianceId": "appliance_test_00000000",
+      "friendlyName": "Test Device",
+      "botName": "test_bot",
+      "stateSetting": {
+        "temperature": {
+          "name": "温度",
+          "value": 16,
+          "valueType": "NUM",
+          "scale": "CELSIUS",
+          "valueRangeMap": {
+            "min": 0,
+            "max": 60
+          },
+          "time": "2025-12-24 23:01:59",
+          "key": "temperature"
+        },
+        "mode": {
+          "name": "模式",
+          "value": "COOL",
+          "valueType": "ENUM",
+          "scale": "",
+          "valueRangeMap": {
+            "COOL": "制冷",
+            "HEAT": "制热",
+            "AUTO": "自动",
+            "FAN": "送风",
+            "DEHUMIDIFICATION": "除湿",
+            "SLEEP": "睡眠"
+          },
+          "time": "2025-12-20 19:02:20"
+        },
+        "turnOnState": {
+          "name": "开关",
+          "value": "OFF",
+          "valueType": "ENUM",
+          "scale": "",
+          "valueRangeMap": {
+            "ON": "打开",
+            "OFF": "关闭"
+          },
+          "time": "2025-10-12 15:03:43"
+        }
+      },
+      "groupName": "主卧"
+    },
+    "isSingleFloor": true
+  }
+}

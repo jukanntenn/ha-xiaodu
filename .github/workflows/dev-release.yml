@@ -1,0 +1,53 @@
+name: Development release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "custom_components/**"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release_zip_file:
+    name: Prepare development release asset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set manifest version to dev
+        run: |
+          sed -i 's/"version": "[^"]*"/"version": "dev"/' custom_components/xiaodu/manifest.json
+
+      - name: Create zip
+        run: |
+          cd custom_components/xiaodu
+          zip xiaodu.zip -r ./
+
+      - name: Move dev tag
+        run: |
+          git tag --force dev "${GITHUB_SHA}"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" refs/tags/dev --force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create dev release
+        run: |
+          gh release view dev || gh release create dev --title "Development build" --notes "Moving development build from main." --prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload zip to dev release
+        run: gh release upload dev ./custom_components/xiaodu/xiaodu.zip#xiaodu.zip --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

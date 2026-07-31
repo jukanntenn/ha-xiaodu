@@ -1,0 +1,130 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "配置 Xiaodu",
+                "description": "选择配置方式",
+                "menu_options": {
+                    "cookie": "输入百度 Cookie"
+                }
+            },
+            "cookie": {
+                "title": "输入百度 Cookie",
+                "description": "输入百度 Cookie（BDUSS）以认证小度云端",
+                "data": {
+                    "cookie": "百度 Cookie"
+                },
+                "data_description": {
+                    "cookie": "百度 BDUSS Cookie，有效期约 180 天"
+                }
+            },
+            "home": {
+                "title": "选择家庭",
+                "description": "选择要同步设备的家庭",
+                "data": {
+                    "house_id": "家庭"
+                },
+                "data_description": {
+                    "house_id": "包含智能设备的小度家庭"
+                }
+            },
+            "device": {
+                "title": "选择设备",
+                "description": "选择要同步的设备",
+                "data": {
+                    "device_ids": "设备"
+                },
+                "data_description": {
+                    "device_ids": "选择要添加到 Home Assistant 的一个或多个设备"
+                }
+            },
+            "room_mapping": {
+                "title": "房间映射",
+                "description": "确认小度房间到 Home Assistant 区域的映射",
+                "data": {
+                    "room_mapping": "房间映射"
+                }
+            },
+            "bemfa": {
+                "title": "巴法云配置",
+                "description": "配置巴法云同步（可选）",
+                "data": {
+                    "bemfa_uid": "巴法云 UID",
+                    "sync_enabled": "启用设备同步"
+                },
+                "data_description": {
+                    "bemfa_uid": "巴法云私钥（UID），留空则跳过"
+                }
+            },
+            "reauth_confirm": {
+                "title": "重新认证 Xiaodu",
+                "description": "百度 Cookie 已过期，请输入新的 Cookie 以继续。",
+                "data": {
+                    "cookie": "百度 Cookie"
+                },
+                "data_description": {
+                    "cookie": "新的百度 BDUSS Cookie"
+                }
+            }
+        },
+        "error": {
+            "invalid_cookie": "Cookie 格式无效",
+            "cannot_connect": "无法连接到小度云端",
+            "auth_failed": "认证失败",
+            "no_homes": "未找到家庭",
+            "no_devices": "未找到设备"
+        },
+        "abort": {
+            "already_configured": "已配置",
+            "reauth_successful": "重新认证成功"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Xiaodu 选项",
+                "menu_options": {
+                    "room_mapping": "修改房间映射",
+                    "bemfa": "修改巴法云配置",
+                    "reauth": "重新认证"
+                }
+            },
+            "room_mapping": {
+                "title": "修改房间映射",
+                "description": "修改小度房间到 Home Assistant 区域的映射",
+                "data": {
+                    "room_mapping": "房间映射"
+                },
+                "data_description": {
+                    "room_mapping": "将每个小度房间映射到 Home Assistant 区域"
+                }
+            },
+            "bemfa": {
+                "title": "修改巴法云配置",
+                "description": "修改巴法云同步设置",
+                "data": {
+                    "bemfa_uid": "巴法云 UID",
+                    "sync_enabled": "启用设备同步"
+                },
+                "data_description": {
+                    "bemfa_uid": "巴法云私钥（UID），留空则禁用"
+                }
+            },
+            "reauth": {
+                "title": "重新认证",
+                "description": "输入新的百度 Cookie",
+                "data": {
+                    "cookie": "百度 Cookie"
+                },
+                "data_description": {
+                    "cookie": "新的百度 BDUSS Cookie"
+                }
+            }
+        },
+        "error": {
+            "invalid_cookie": "Cookie 格式无效",
+            "cannot_connect": "无法连接到小度云端",
+            "auth_failed": "认证失败"
+        }
+    }
+}

@@ -1,0 +1,100 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "xiaodu"
+version = "0.1.0rc1"
+description = "Xiaodu integration for Home Assistant"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.13"
+dependencies = ["paho-mqtt>=2.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "pytest-aiohttp>=1.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.0",
+    "pytest-timeout>=2.0",
+    "pytest-homeassistant-custom-component",
+    "ruff==0.15.22",
+    "basedpyright",
+    "ty",
+    "codespell>=2.4",
+    "tomli>=2.0; python_version < '3.11'",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+exclude = ["collect.py"]
+
+[tool.ruff.lint]
+select = [
+    "A",     # flake8-builtins（builtin shadowing）
+    "ASYNC", # flake8-async
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "DTZ",   # flake8-datetimez（时区安全）
+    "E",     # pycodestyle errors
+    "F",     # pyflakes
+    "FURB",  # refurb
+    "I",     # isort
+    "LOG",   # flake8-logging
+    "N",     # pep8-naming
+    "PERF",  # perflint
+    "PGH",   # pygrep-hooks
+    "PIE",   # flake8-pie
+    "PT",    # flake8-pytest-style
+    "PTH",   # flake8-pathlib
+    "RET",   # flake8-return
+    "RUF",   # ruff 专属
+    "S",     # flake8-bandit（安全子集）
+    "SIM",   # flake8-simplify
+    "UP",    # pyupgrade
+    "W",     # pycodestyle warnings
+]
+# 中文 docstring/注释允许使用全角标点与箭头（中文排版需要）
+allowed-confusables = ["（", "）", "，", "：", "；", "→"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # 测试代码允许 assert
+".claude/hooks/**" = ["SIM105", "S603", "S607"]  # hook 脚本
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.basedpyright]
+include = ["custom_components"]
+exclude = [
+    "**/__pycache__",
+    ".venv",
+    "tests",
+    ".local",
+    "**/snapshots",
+]
+pythonVersion = "3.13"
+typeCheckingMode = "all"
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.src]
+include = ["custom_components"]
+
+[tool.codespell]
+skip = "*.json,*.lock,*.svg,*.ambr,.git,.venv,.local,uv.lock,tests/fixtures"
+ignore-words-list = ["hass"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]

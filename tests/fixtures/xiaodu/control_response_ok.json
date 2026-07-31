@@ -1,0 +1,19 @@
+{
+  "status": 0,
+  "msg": "ok",
+  "logid": 3164752553,
+  "from": "h5_control",
+  "data": {
+    "41928327648350305641g95376u7ei23_884": {
+      "header": {
+        "messageId": "Xsnsml-3e8710d22z6916.69784801",
+        "name": "TurnOnConfirmation",
+        "namespace": "DuerOS.ConnectedHome.Control",
+        "payloadVersion": 3
+      },
+      "payload": {
+        "attributes": null
+      }
+    }
+  }
+}

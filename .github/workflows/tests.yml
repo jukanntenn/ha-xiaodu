@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "**.py"
+      - "uv.lock"
+      - "pyproject.toml"
+  pull_request:
+    paths:
+      - "**.py"
+      - "uv.lock"
+      - "pyproject.toml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { ha-target: stable-prev, phacc-pin: "==0.13.316" }
+          - { ha-target: latest, phacc-pin: "" }
+    name: pytest (ha-target=${{ matrix.ha-target }})
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: |
+            pyproject.toml
+            uv.lock
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - run: uv pip install "pytest-homeassistant-custom-component${{ matrix.phacc-pin }}"
+      - name: Run tests
+        run: |
+          uv run pytest \
+            --timeout=9 \
+            --durations=10 \
+            --cov=custom_components.xiaodu \
+            --cov-report=xml \
+            tests
+      - name: Upload coverage
+        if: matrix.ha-target == 'latest'
+        uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e # v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: coverage.xml

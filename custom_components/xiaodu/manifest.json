@@ -1,0 +1,14 @@
+{
+    "domain": "xiaodu",
+    "name": "Xiaodu",
+    "codeowners": ["@jukanntenn"],
+    "config_flow": true,
+    "dependencies": [],
+    "documentation": "https://github.com/jukanntenn/ha-xiaodu",
+    "integration_type": "hub",
+    "iot_class": "cloud_polling",
+    "issue_tracker": "https://github.com/jukanntenn/ha-xiaodu/issues",
+    "loggers": ["custom_components.xiaodu"],
+    "requirements": ["paho-mqtt>=2.0"],
+    "version": "0.1.0rc1"
+}

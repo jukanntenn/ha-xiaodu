@@ -1,0 +1,42 @@
+name: 功能建议
+description: 小度设备，该插件没有同步设备 / 实体功能建议 / 插件功能建议
+body:
+  - type: input
+    validations:
+      required: true
+    attributes:
+      label: Device model / 设备型号
+      placeholder: 需要提供建议的设备型号，没有填写无
+      description: |
+        > [⚙️ 小度网页版 > 有问题的设备 > 产品/公司/设备名](https://xiaodu.baidu.com/saiya/smarthome/index.html)
+
+  - type: input
+    attributes:
+      label: Component version / 插件版本
+      placeholder: 0.1.0
+      description: |
+        > [⚙️ Settings > System > Repairs > Three Dots in Upper Right > System information](https://my.home-assistant.io/redirect/system_health) > `custom_components.xiaodu`
+        > [⚙️ 配置 > 系统 > 修复 > 右上角三个点 > 系统信息](https://my.home-assistant.io/redirect/system_health) > `custom_components.xiaodu`
+
+  - type: input
+    attributes:
+      label: HA core version / HA版本
+      placeholder: 2026.x.x
+      description: |
+        > [⚙️ Settings > ℹ️️ About](https://my.home-assistant.io/redirect/info)
+        > [⚙️ 配置 > ℹ️️ 关于](https://my.home-assistant.io/redirect/info)
+
+  - type: textarea
+    attributes:
+      label: The problem / 功能建议描写
+
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Entity attributes / 实体属性
+      render: yaml
+      description: |
+        > [🔨 Developer tools > ℹ️ State](https://my.home-assistant.io/redirect/developer_states) > 🔍 Filter (`button.xxxx_info`)
+        > [🔨 开发者工具 > ℹ️ 状态](https://my.home-assistant.io/redirect/developer_states) > 🔍 筛选该设备下的info实体
+        > 如果没有实体，请填写`无实体`

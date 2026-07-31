@@ -1,0 +1,38 @@
+{
+  "status": 0,
+  "msg": "ok",
+  "data": {
+    "appliance": {
+      "applianceTypes": [
+        "LIGHT"
+      ],
+      "applianceId": "appliance_test_00000000",
+      "friendlyName": "Test Device",
+      "botName": "test_bot",
+      "stateSetting": {
+        "turnOnState": {
+          "name": "开关",
+          "value": "OFF",
+          "valueType": "ENUM",
+          "scale": "",
+          "valueRangeMap": {
+            "ON": "打开",
+            "OFF": "关闭"
+          },
+          "time": "2026-06-01 00:02:51"
+        },
+        "mode": {
+          "valueType": "ENUM",
+          "name": "模式",
+          "valueRangeMap": {
+            "BRIGHT": "明亮",
+            "COMFORTABLE": "舒适",
+            "NIGHT_UP": "起夜"
+          }
+        }
+      },
+      "groupName": "次卧"
+    },
+    "isSingleFloor": true
+  }
+}

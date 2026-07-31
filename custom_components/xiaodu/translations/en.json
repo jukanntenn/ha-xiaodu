@@ -1,0 +1,130 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Configure Xiaodu",
+                "description": "Choose how to configure Xiaodu",
+                "menu_options": {
+                    "cookie": "Enter Baidu Cookie"
+                }
+            },
+            "cookie": {
+                "title": "Enter Baidu Cookie",
+                "description": "Enter your Baidu Cookie (BDUSS) to authenticate with Xiaodu cloud",
+                "data": {
+                    "cookie": "Baidu Cookie"
+                },
+                "data_description": {
+                    "cookie": "Your Baidu BDUSS cookie, valid for about 180 days"
+                }
+            },
+            "home": {
+                "title": "Select Home",
+                "description": "Select the home to synchronize devices from",
+                "data": {
+                    "house_id": "Home"
+                },
+                "data_description": {
+                    "house_id": "The Xiaodu home containing your smart devices"
+                }
+            },
+            "device": {
+                "title": "Select Devices",
+                "description": "Select the devices to synchronize",
+                "data": {
+                    "device_ids": "Devices"
+                },
+                "data_description": {
+                    "device_ids": "Select one or more devices to add to Home Assistant"
+                }
+            },
+            "room_mapping": {
+                "title": "Room Mapping",
+                "description": "Confirm the mapping between Xiaodu rooms and Home Assistant areas",
+                "data": {
+                    "room_mapping": "Room Mapping"
+                }
+            },
+            "bemfa": {
+                "title": "Bemfa Cloud Configuration",
+                "description": "Configure Bemfa Cloud synchronization (optional)",
+                "data": {
+                    "bemfa_uid": "Bemfa UID",
+                    "sync_enabled": "Enable Device Sync"
+                },
+                "data_description": {
+                    "bemfa_uid": "Your Bemfa Cloud private key (UID), leave empty to skip"
+                }
+            },
+            "reauth_confirm": {
+                "title": "Re-authenticate Xiaodu",
+                "description": "Your Baidu Cookie has expired. Enter a new one to continue.",
+                "data": {
+                    "cookie": "Baidu Cookie"
+                },
+                "data_description": {
+                    "cookie": "Your new Baidu BDUSS cookie"
+                }
+            }
+        },
+        "error": {
+            "invalid_cookie": "Invalid Cookie format",
+            "cannot_connect": "Cannot connect to Xiaodu cloud",
+            "auth_failed": "Authentication failed",
+            "no_homes": "No homes found",
+            "no_devices": "No devices found"
+        },
+        "abort": {
+            "already_configured": "Already configured",
+            "reauth_successful": "Re-authentication successful"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Xiaodu Options",
+                "menu_options": {
+                    "room_mapping": "Modify Room Mapping",
+                    "bemfa": "Modify Bemfa Configuration",
+                    "reauth": "Re-authenticate"
+                }
+            },
+            "room_mapping": {
+                "title": "Modify Room Mapping",
+                "description": "Modify the mapping between Xiaodu rooms and Home Assistant areas",
+                "data": {
+                    "room_mapping": "Room Mapping"
+                },
+                "data_description": {
+                    "room_mapping": "Map each Xiaodu room to a Home Assistant area"
+                }
+            },
+            "bemfa": {
+                "title": "Modify Bemfa Configuration",
+                "description": "Modify Bemfa Cloud synchronization settings",
+                "data": {
+                    "bemfa_uid": "Bemfa UID",
+                    "sync_enabled": "Enable Device Sync"
+                },
+                "data_description": {
+                    "bemfa_uid": "Your Bemfa Cloud private key (UID), leave empty to disable"
+                }
+            },
+            "reauth": {
+                "title": "Re-authenticate",
+                "description": "Enter a new Baidu Cookie",
+                "data": {
+                    "cookie": "Baidu Cookie"
+                },
+                "data_description": {
+                    "cookie": "Your new Baidu BDUSS cookie"
+                }
+            }
+        },
+        "error": {
+            "invalid_cookie": "Invalid Cookie format",
+            "cannot_connect": "Cannot connect to Xiaodu cloud",
+            "auth_failed": "Authentication failed"
+        }
+    }
+}

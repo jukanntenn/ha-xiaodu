@@ -1,0 +1,74 @@
+[update]
+cooldown_days = 7
+freeze = true
+
+# ── 基础卫生（prek builtin，零网络零依赖，Rust 原生最快）──
+[[repos]]
+repo = "builtin"
+hooks = [
+    { id = "trailing-whitespace" },
+    { id = "end-of-file-fixer" },
+    { id = "check-yaml" },
+    { id = "check-toml" },
+    { id = "check-json" },
+    { id = "mixed-line-ending", args = ["--fix=lf"] },
+    { id = "check-merge-conflict" },
+    { id = "check-added-large-files", args = ["--maxkb=2000"] },
+    { id = "detect-private-key" },
+    { id = "no-commit-to-branch", args = ["--branch", "main"] },
+]
+
+# ── Python lint + format ──
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.15.22"
+hooks = [
+    { id = "ruff-check", args = ["--fix", "--exit-non-zero-on-fix"] },
+    { id = "ruff-format" },
+]
+
+# ── 拼写检查 ──
+[[repos]]
+repo = "https://github.com/codespell-project/codespell"
+rev = "v2.4.1"
+hooks = [
+    { id = "codespell", additional_dependencies = ["tomli"], args = ["--toml", "pyproject.toml"] },
+]
+
+# ── GitHub Actions workflow 校验 ──
+[[repos]]
+repo = "https://github.com/python-jsonschema/check-jsonschema"
+rev = "0.37.4"
+hooks = [
+    { id = "check-github-workflows", args = ["--verbose"] },
+]
+
+# ── GitHub Actions 语法检查（含 shellcheck 集成）──
+[[repos]]
+repo = "https://github.com/rhysd/actionlint"
+rev = "v1.7.12"
+hooks = [
+    { id = "actionlint", additional_dependencies = ["github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"] },
+]
+
+# ── GitHub Actions 安全（供应链漏洞）──
+[[repos]]
+repo = "https://github.com/zizmorcore/zizmor-pre-commit"
+rev = "v1.26.1"
+hooks = [
+    { id = "zizmor" },
+]
+
+# ── uv.lock 一致性（改了 pyproject 必须同步 lock）──
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "uv-lock", name = "uv lock --check", language = "system", entry = "uv lock --check", pass_filenames = false, files = "^(pyproject\\.toml|uv\\.lock)$" },
+]
+
+# ── CLAUDE.md / AGENTS.md 一致性（独立维护，强制同步）──
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "agents-claude-sync", name = "CLAUDE.md == AGENTS.md", language = "system", entry = "diff -q CLAUDE.md AGENTS.md", pass_filenames = false, always_run = true },
+]

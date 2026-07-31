@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+
+# Testing
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+
+# Ruff
+.ruff_cache/
+
+# ty
+.ty/
+
+# IDE
+.idea/
+*.swp
+*.swo
+.vscode/settings.local.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local reference libraries and docs (not part of the project)
+.local/
+
+.zcode/plans/

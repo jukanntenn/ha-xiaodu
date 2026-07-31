@@ -1,0 +1,175 @@
+# HA Integration Quality Scale 追踪
+# 目标等级：🥈 Silver（含 Bronze 子集）
+# 说明：custom 集成不被官方评分，本文件用于结构化追踪质量规则、驱动真实环境验收
+# 规则定义：https://developers.home-assistant.io/docs/core/integration-quality-scale/rules/
+
+rules:
+  # ===== 🥉 Bronze =====
+  action-setup:
+    status: exempt
+    comment: 本集成不注册自定义 action，使用 HA 标准平台服务（light.turn_on 等）
+  appropriate-polling:
+    status: done
+    comment: "DataUpdateCoordinator 30 秒轮询（iot_class: cloud_polling），对齐 specs/03"
+  brands:
+    status: todo
+    comment: 需提交品牌图标到 home-assistant/brands 仓库
+  common-modules:
+    status: done
+    comment: coordinator.py + entity.py 已按 developers docs common-modules 规则拆分
+  config-flow:
+    status: done
+    comment: "config_flow: true，UI 配置流程完整"
+  config-flow-test-coverage:
+    status: done
+    comment: config_flow 测试覆盖 95%+，aioclient_mock 驱动真实 API（specs/14）
+  dependency-transparency:
+    status: done
+    comment: 仅依赖 paho-mqtt，manifest.json requirements 透明
+  docs-actions:
+    status: exempt
+    comment: 本集成不提供自定义 action
+  docs-conditions:
+    status: exempt
+    comment: 本集成不提供 condition
+  docs-high-level-description:
+    status: done
+    comment: README 已有功能概述
+  docs-installation-instructions:
+    status: done
+    comment: README 含 HACS 与手动安装步骤
+  docs-removal-instructions:
+    status: todo
+    comment: 待补充移除集成步骤文档
+  docs-triggers:
+    status: exempt
+    comment: 本集成不提供 trigger
+  entity-event-setup:
+    status: done
+    comment: 实体通过 CoordinatorEntity 订阅协调器更新
+  entity-unique-id:
+    status: done
+    comment: 以 appliance_id 作为 unique_id
+  has-entity-name:
+    status: done
+    comment: XiaoduEntity 设置 _attr_has_entity_name = True
+  runtime-data:
+    status: done
+    comment: 使用 config_entry.runtime_data 存储协调器（specs/03）
+  test-before-configure:
+    status: done
+    comment: config_flow 中调用 check_session 验证 Cookie
+  test-before-setup:
+    status: done
+    comment: coordinator._async_setup 处理初始化
+  unique-config-entry:
+    status: done
+    comment: 以 house_id 作为 unique_id，单配置条目
+
+  # ===== 🥈 Silver =====
+  action-exceptions:
+    status: exempt
+    comment: 本集成不提供自定义 action
+  config-entry-unloading:
+    status: done
+    comment: async_unload_entry 实现完整，含巴法云 MQTT 断开
+  docs-configuration-parameters:
+    status: done
+    comment: README 含巴法云配置、房间映射选项说明
+  docs-installation-parameters:
+    status: done
+    comment: README 配置步骤含 BDUSS Cookie 等参数说明
+  entity-unavailable:
+    status: done
+    comment: CoordinatorEntity 内建不可用逻辑，UpdateFailed 时标记 unavailable
+  integration-owner:
+    status: done
+    comment: manifest.json codeowners 已设置
+  log-when-unavailable:
+    status: done
+    comment: 协调器与 API 客户端在不可用时记录 info 级日志
+  parallel-updates:
+    status: done
+    comment: 各平台设置 PARALLEL_UPDATES = 0（cloud_polling，HA 串行处理）
+  reauthentication-flow:
+    status: done
+    comment: 实现 async_step_reauth / async_step_reauth_confirm（specs/06）
+  test-coverage:
+    status: done
+    comment: 测试重写完成，aioclient_mock 范式，总覆盖率 83%（specs/14），覆盖所有 6 个平台 + coordinator + config_flow + diagnostics + e2e
+
+  # ===== 🥇 Gold（超出 silver 目标，记录现状）=====
+  devices:
+    status: done
+    comment: DeviceInfo 使用 (DOMAIN, appliance_id) 标识
+  diagnostics:
+    status: done
+    comment: diagnostics.py 已实现，含设备/配置/同步状态（specs）
+  discovery:
+    status: exempt
+    comment: 小度 API 不支持设备自动发现，需手动选择设备
+  discovery-update-info:
+    status: exempt
+    comment: 无设备发现机制
+  docs-data-update:
+    status: todo
+    comment: 待补充数据更新策略文档（30 秒轮询）
+  docs-examples:
+    status: todo
+    comment: 待补充使用示例（自动化、仪表板）
+  docs-known-limitations:
+    status: todo
+    comment: 待补充已知限制（如空调仅支持调温）
+  docs-supported-devices:
+    status: done
+    comment: README 含支持的设备类型表
+  docs-supported-functions:
+    status: todo
+    comment: 待补充实体功能描述
+  docs-troubleshooting:
+    status: done
+    comment: README FAQ 含常见问题排查
+  docs-use-cases:
+    status: todo
+    comment: 待补充典型用例
+  dynamic-devices:
+    status: done
+    comment: coordinator 检测设备增删，动态创建/移除实体（specs/05）
+  entity-category:
+    status: exempt
+    comment: 设备实体均为主要控制实体，无需分类
+  entity-device-class:
+    status: done
+    comment: switch 区分 OUTLET/SWITCH，cover 用 CURTAIN 等
+  entity-disabled-by-default:
+    status: exempt
+    comment: 所有实体均为用户主动控制设备，默认启用
+  entity-translations:
+    status: done
+    comment: strings.json + translations/ 支持 en/zh-Hans（specs/12）
+  exception-translations:
+    status: todo
+    comment: 待补充异常消息翻译
+  icon-translations:
+    status: todo
+    comment: 待补充图标翻译
+  reconfiguration-flow:
+    status: todo
+    comment: 待实现 options flow 的重配置
+  repair-issues:
+    status: todo
+    comment: 待引入 repairs issue（如 Cookie 即将过期提醒）
+  stale-devices:
+    status: done
+    comment: 轮询时设备消失即标记 unavailable（specs/05）
+
+  # ===== 🏆 Platinum（记录现状）=====
+  async-dependency:
+    status: done
+    comment: 全异步实现（aiohttp + async 调用链）
+  inject-websession:
+    status: done
+    comment: 使用 async_get_clientsession 注入会话
+  strict-typing:
+    status: todo
+    comment: 待 ty 严格类型检查通过

@@ -1,0 +1,1021 @@
+{
+  "status": 0,
+  "msg": "",
+  "data": {
+    "isenable": true,
+    "appliances": [
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_001",
+        "room": "次卧",
+        "friendlyName": "Test Light 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-01 00:02:51"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_002",
+        "room": "主卧",
+        "friendlyName": "Test Light 2",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-25 09:18:19"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_003",
+        "room": "主卧",
+        "friendlyName": "Test Light 3",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-28 21:57:22"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_004",
+        "room": "主卧",
+        "friendlyName": "Test Light 4",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-28 21:57:22"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_005",
+        "room": "主卧",
+        "friendlyName": "Test Light 5",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-18 09:15:04"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_006",
+        "room": "主卧",
+        "friendlyName": "Test Light 6",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-05-23 15:11:32"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_007",
+        "room": "主卧",
+        "friendlyName": "Test Light 7",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-20 17:13:43"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_CONDITION"
+        ],
+        "applianceId": "appliance_test_air_condition_001",
+        "room": "主卧",
+        "friendlyName": "Test Air Condition 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 16,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:01:59",
+            "key": "temperature"
+          },
+          "mode": {
+            "name": "模式",
+            "value": "COOL",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "COOL": "制冷",
+              "HEAT": "制热",
+              "AUTO": "自动",
+              "FAN": "送风",
+              "DEHUMIDIFICATION": "除湿",
+              "SLEEP": "睡眠"
+            },
+            "time": "2025-12-20 19:02:20"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-10-12 15:03:43"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_CONDITION"
+        ],
+        "applianceId": "appliance_test_air_condition_002",
+        "room": "次卧",
+        "friendlyName": "Test Air Condition 2",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 15,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:02:00",
+            "key": "temperature"
+          },
+          "mode": {
+            "name": "模式",
+            "value": "COOL",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "COOL": "制冷",
+              "HEAT": "制热",
+              "AUTO": "自动",
+              "FAN": "送风",
+              "DEHUMIDIFICATION": "除湿",
+              "SLEEP": "睡眠"
+            },
+            "time": "2025-12-20 19:02:20"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-10-26 13:07:29"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_008",
+        "room": "儿童房",
+        "friendlyName": "Test Light 8",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "ON",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-25 09:01:35"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_CONDITION"
+        ],
+        "applianceId": "appliance_test_air_condition_003",
+        "room": "儿童房",
+        "friendlyName": "Test Air Condition 3",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 16,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:02:00",
+            "key": "temperature"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-12-17 01:02:42"
+          },
+          "mode": {
+            "name": "模式",
+            "value": "COOL",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "COOL": "制冷",
+              "HEAT": "制热",
+              "AUTO": "自动",
+              "FAN": "送风",
+              "DEHUMIDIFICATION": "除湿",
+              "SLEEP": "睡眠"
+            },
+            "time": "2025-12-17 00:07:40"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_009",
+        "room": "公卫",
+        "friendlyName": "Test Light 9",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-24 21:07:56"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_010",
+        "room": "公卫",
+        "friendlyName": "Test Light 10",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-25 10:00:57"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_011",
+        "room": "公卫",
+        "friendlyName": "Test Light 11",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-04-28 19:58:59"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_012",
+        "room": "公卫",
+        "friendlyName": "Test Light 12",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-29 22:40:21"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_013",
+        "room": "书房",
+        "friendlyName": "Test Light 13",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-04-28 19:59:00"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_CONDITION"
+        ],
+        "applianceId": "appliance_test_air_condition_004",
+        "room": "书房",
+        "friendlyName": "Test Air Condition 4",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 10,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:02:02",
+            "key": "temperature"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-12-17 01:02:44"
+          },
+          "mode": {
+            "name": "模式",
+            "value": "COOL",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "COOL": "制冷",
+              "HEAT": "制热",
+              "AUTO": "自动",
+              "FAN": "送风",
+              "DEHUMIDIFICATION": "除湿",
+              "SLEEP": "睡眠"
+            },
+            "time": "2025-12-17 01:02:44"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_014",
+        "room": "客厅",
+        "friendlyName": "Test Light 14",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-24 21:32:43"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_015",
+        "room": "客厅",
+        "friendlyName": "Test Light 15",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-04-28 19:59:01"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_016",
+        "room": "厨房",
+        "friendlyName": "Test Light 16",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-25 09:32:19"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_CONDITION"
+        ],
+        "applianceId": "appliance_test_air_condition_005",
+        "room": "客厅",
+        "friendlyName": "Test Air Condition 5",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 13,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:02:03",
+            "key": "temperature"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-12-17 01:02:45"
+          },
+          "mode": {
+            "name": "模式",
+            "value": "COOL",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "COOL": "制冷",
+              "HEAT": "制热",
+              "AUTO": "自动",
+              "FAN": "送风",
+              "DEHUMIDIFICATION": "除湿",
+              "SLEEP": "睡眠"
+            },
+            "time": "2025-12-17 01:02:45"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "HEATER"
+        ],
+        "applianceId": "appliance_test_heater_001",
+        "room": "客厅",
+        "friendlyName": "Test Heater 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "temperature": {
+            "name": "温度",
+            "value": 13,
+            "valueType": "NUM",
+            "scale": "CELSIUS",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 60
+            },
+            "time": "2025-12-24 23:02:03",
+            "key": "temperature"
+          },
+          "turnOnState": {
+            "name": "开关",
+            "value": "ON",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2025-11-06 11:06:29"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_017",
+        "room": "餐厅",
+        "friendlyName": "Test Light 17",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-21 11:36:07"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_018",
+        "room": "餐厅",
+        "friendlyName": "Test Light 18",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-21 23:12:26"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "LIGHT"
+        ],
+        "applianceId": "appliance_test_light_019",
+        "room": "餐厅",
+        "friendlyName": "Test Light 19",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-07-24 21:32:43"
+          },
+          "mode": {
+            "valueType": "ENUM",
+            "name": "模式",
+            "valueRangeMap": {
+              "BRIGHT": "明亮",
+              "COMFORTABLE": "舒适",
+              "NIGHT_UP": "起夜"
+            }
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "AIR_FRESHER"
+        ],
+        "applianceId": "appliance_test_air_fresher_001",
+        "room": "客厅",
+        "friendlyName": "Test Air Fresher 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": ""
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "SOCKET"
+        ],
+        "applianceId": "appliance_test_socket_001",
+        "room": "客厅",
+        "friendlyName": "Test Socket 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-01 00:02:51"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "SWITCH"
+        ],
+        "applianceId": "appliance_test_switch_001",
+        "room": "卧室",
+        "friendlyName": "Test Switch 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "ON",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-01 00:02:51"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "CURTAIN"
+        ],
+        "applianceId": "appliance_test_curtain_001",
+        "room": "客厅",
+        "friendlyName": "Test Curtain 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-01 00:02:51"
+          },
+          "position": {
+            "name": "位置",
+            "value": 0,
+            "valueType": "NUM",
+            "scale": "%",
+            "valueRangeMap": {
+              "min": 0,
+              "max": 100
+            },
+            "time": "2026-06-01 00:02:51"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "DOOR_LOCK"
+        ],
+        "applianceId": "appliance_test_door_lock_001",
+        "room": "大门",
+        "friendlyName": "Test Door Lock 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "lockState": {
+            "name": "锁",
+            "value": "locked",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "locked": "已锁定",
+              "unlocked": "已解锁"
+            },
+            "time": "2026-06-01 00:02:51"
+          }
+        }
+      },
+      {
+        "applianceTypes": [
+          "CLOTHES_RACK"
+        ],
+        "applianceId": "appliance_test_clothes_rack_001",
+        "room": "阳台",
+        "friendlyName": "Test Clothes Rack 1",
+        "botName": "test_bot",
+        "stateSetting": {
+          "turnOnState": {
+            "name": "开关",
+            "value": "OFF",
+            "valueType": "ENUM",
+            "scale": "",
+            "valueRangeMap": {
+              "ON": "打开",
+              "OFF": "关闭"
+            },
+            "time": "2026-06-01 00:02:51"
+          }
+        }
+      }
+    ]
+  },
+  "logId": 8451462704
+}

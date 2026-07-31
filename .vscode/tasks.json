@@ -1,0 +1,45 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Pytest",
+            "type": "shell",
+            "command": "uv run pytest",
+            "group": { "kind": "test", "isDefault": true },
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Ruff check",
+            "type": "shell",
+            "command": "uv run ruff check",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Ruff format",
+            "type": "shell",
+            "command": "uv run ruff format",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        },
+        {
+            "label": "basedpyright",
+            "type": "shell",
+            "command": "uv run basedpyright",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        },
+        {
+            "label": "Prek run",
+            "type": "shell",
+            "command": "prek run --show-diff-on-failure",
+            "group": "test",
+            "presentation": { "reveal": "always", "panel": "new" },
+            "problemMatcher": []
+        }
+    ]
+}
