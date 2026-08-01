@@ -151,8 +151,7 @@ class BemfaDeviceSyncManager:
         for appliance_id, mapping in self._device_mapping.items():
             if (
                 mapping.sync_status == "error"
-                and time.time() - mapping.last_sync_time
-                >= BEMFA_RETRY_INTERVAL_SECONDS
+                and time.time() - mapping.last_sync_time >= BEMFA_RETRY_INTERVAL_SECONDS
             ):
                 retry_ids.add(appliance_id)
 
@@ -205,7 +204,9 @@ class BemfaDeviceSyncManager:
             sync_status=(
                 "synced"
                 if created
-                else "permanent_error" if result.code == 40009 else "error"
+                else "permanent_error"
+                if result.code == 40009
+                else "error"
             ),
             sync_error=result.error_msg,
         )

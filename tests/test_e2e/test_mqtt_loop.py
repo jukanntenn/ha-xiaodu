@@ -99,9 +99,7 @@ async def test_mqtt_downlink_controls_device_and_reports_state(
     await hass.async_block_till_done()
 
     coordinator = entry.runtime_data
-    mapping = coordinator.bemfa_sync_manager.device_mapping[
-        "appliance_test_light_001"
-    ]
+    mapping = coordinator.bemfa_sync_manager.device_mapping["appliance_test_light_001"]
     assert mapping.bemfa_topic is not None
 
     aioclient_mock.mock_calls.clear()

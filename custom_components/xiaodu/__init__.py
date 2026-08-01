@@ -101,9 +101,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     from .bemfa.protocol import parse_command
 
                     commands = parse_command(mapping.device_type, payload)
-                    _LOGGER.debug(
-                        "Bemfa MQTT downlink commands: %s", commands
-                    )
+                    _LOGGER.debug("Bemfa MQTT downlink commands: %s", commands)
                     if commands:
                         await coordinator.handle_bemfa_command(appliance_id, commands)
 

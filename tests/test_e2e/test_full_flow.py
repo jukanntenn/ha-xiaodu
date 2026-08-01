@@ -271,9 +271,7 @@ async def test_scenario_3_polling_discovers_state_change(
     assert new_state == "ON"
 
     # 状态变化通过真实 broker 上报（wire 断言：{topic}/up = "on"）
-    mapping = coordinator.bemfa_sync_manager.device_mapping[
-        "appliance_test_light_001"
-    ]
+    mapping = coordinator.bemfa_sync_manager.device_mapping["appliance_test_light_001"]
     _up_topic, payload = await bemfa_mqtt_probe.wait_for(
         lambda t, p: t == f"{mapping.bemfa_topic}/up" and p == "on"
     )
@@ -424,9 +422,7 @@ async def test_scenario_6_bemfa_mqtt_publish(
     await hass.async_block_till_done()
 
     coordinator = entry.runtime_data
-    mapping = coordinator.bemfa_sync_manager.device_mapping[
-        "appliance_test_light_001"
-    ]
+    mapping = coordinator.bemfa_sync_manager.device_mapping["appliance_test_light_001"]
     assert mapping.bemfa_topic is not None
 
     # Turn on the light → 乐观更新 → 真实 MQTT 上报

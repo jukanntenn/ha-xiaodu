@@ -91,9 +91,7 @@ async def test_publish_reaches_probe(
     )
     await client.async_connect(timeout_seconds=2.0)
     assert client.publish("dev/up", "on#80") is True
-    _topic, payload = await bemfa_mqtt_probe.wait_for(
-        lambda t, p: t == "dev/up"
-    )
+    _topic, payload = await bemfa_mqtt_probe.wait_for(lambda t, p: t == "dev/up")
     assert payload == "on#80"
     client.disconnect()
 
