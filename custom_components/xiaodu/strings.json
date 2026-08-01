@@ -46,8 +46,17 @@
                 }
             },
             "bemfa": {
-                "title": "Bemfa Cloud Configuration",
-                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Leave all fields empty to skip.\n\nObtain your credentials after completing identity verification on Bemfa Cloud:\n1. Log in to Bemfa Cloud console, open the \"API Key\" page\n2. Copy your private key (UID), secretID, and secretKey\n3. All three fields must be filled together to enable sync",
+                "title": "Bemfa Cloud",
+                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Choose how to authenticate.",
+                "menu_options": {
+                    "bemfa_v2": "v2 API (recommended, requires identity verification)",
+                    "bemfa_v1": "v1 legacy (private key only)",
+                    "bemfa_skip": "Skip (do not sync to Bemfa)"
+                }
+            },
+            "bemfa_v2": {
+                "title": "Bemfa Cloud - v2 API",
+                "description": "The v2 API requires identity verification on Bemfa Cloud. It is the recommended and only maintained path.\n\n1. Log in to the Bemfa Cloud console and complete identity verification\n2. Open the \"API Key\" page and copy your private key (UID), secretID and secretKey\n3. Fill in all three fields below (all marked required)",
                 "data": {
                     "bemfa_uid": "Bemfa UID (Private Key)",
                     "bemfa_secret_id": "secretID",
@@ -55,8 +64,18 @@
                 },
                 "data_description": {
                     "bemfa_uid": "Your Bemfa account private key",
-                    "bemfa_secret_id": "API key pair, requires identity verification",
-                    "bemfa_secret_key": "API key pair, requires identity verification"
+                    "bemfa_secret_id": "API key, requires identity verification",
+                    "bemfa_secret_key": "API key, requires identity verification"
+                }
+            },
+            "bemfa_v1": {
+                "title": "Bemfa Cloud - v1 Legacy",
+                "description": "The v1 API is a hidden legacy endpoint. It only needs your private key (UID) and does not require identity verification, but may be removed at any time.\n\nLog in to the Bemfa Cloud console and copy your private key (UID) below.",
+                "data": {
+                    "bemfa_uid": "Bemfa UID (Private Key)"
+                },
+                "data_description": {
+                    "bemfa_uid": "Your Bemfa account private key"
                 }
             },
             "reauth_confirm": {
@@ -76,7 +95,8 @@
             "auth_failed": "Authentication failed",
             "no_homes": "No homes found",
             "no_devices": "No devices found",
-            "bemfa_secret_required": "UID, secretID and secretKey must all be filled or all empty"
+            "invalid_bemfa_uid": "Invalid Bemfa UID (expects 32 hex chars or a 45-char key)",
+            "bemfa_credentials_required": "Bemfa UID, secretID and secretKey must all be filled"
         },
         "abort": {
             "already_configured": "Already configured",
@@ -95,7 +115,7 @@
             },
             "room_mapping": {
                 "title": "Modify Room Mapping",
-                "description": "Modify the mapping between Xiaodu rooms and Home Assistant areas",
+                "description": "Modify the mapping between Xiaodu rooms and Home Assistant areas.\n\nNote: changes only apply to devices without a manually assigned area.",
                 "data": {
                     "room_mapping": "Room Mapping"
                 },
@@ -105,7 +125,16 @@
             },
             "bemfa": {
                 "title": "Modify Bemfa Configuration",
-                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Leave all fields empty to skip.\n\nObtain your credentials after completing identity verification on Bemfa Cloud:\n1. Log in to Bemfa Cloud console, open the \"API Key\" page\n2. Copy your private key (UID), secretID, and secretKey\n3. All three fields must be filled together to enable sync",
+                "description": "Choose how to authenticate with Bemfa Cloud, or disable the sync.",
+                "menu_options": {
+                    "bemfa_v2": "v2 API (recommended, requires identity verification)",
+                    "bemfa_v1": "v1 legacy (private key only)",
+                    "bemfa_disable": "Disable Bemfa sync"
+                }
+            },
+            "bemfa_v2": {
+                "title": "Bemfa Cloud - v2 API",
+                "description": "The v2 API requires identity verification on Bemfa Cloud. It is the recommended and only maintained path.\n\n1. Log in to the Bemfa Cloud console and complete identity verification\n2. Open the \"API Key\" page and copy your private key (UID), secretID and secretKey\n3. Fill in all three fields below (all marked required)",
                 "data": {
                     "bemfa_uid": "Bemfa UID (Private Key)",
                     "bemfa_secret_id": "secretID",
@@ -113,8 +142,18 @@
                 },
                 "data_description": {
                     "bemfa_uid": "Your Bemfa account private key",
-                    "bemfa_secret_id": "API key pair, requires identity verification",
-                    "bemfa_secret_key": "API key pair, requires identity verification"
+                    "bemfa_secret_id": "API key, requires identity verification",
+                    "bemfa_secret_key": "API key, requires identity verification"
+                }
+            },
+            "bemfa_v1": {
+                "title": "Bemfa Cloud - v1 Legacy",
+                "description": "The v1 API is a hidden legacy endpoint. It only needs your private key (UID) and does not require identity verification, but may be removed at any time.\n\nLog in to the Bemfa Cloud console and copy your private key (UID) below.",
+                "data": {
+                    "bemfa_uid": "Bemfa UID (Private Key)"
+                },
+                "data_description": {
+                    "bemfa_uid": "Your Bemfa account private key"
                 }
             },
             "reauth": {
@@ -132,7 +171,8 @@
             "invalid_cookie": "Invalid Cookie format",
             "cannot_connect": "Cannot connect to Xiaodu cloud",
             "auth_failed": "Authentication failed",
-            "bemfa_secret_required": "UID, secretID and secretKey must all be filled or all empty"
+            "invalid_bemfa_uid": "Invalid Bemfa UID (expects 32 hex chars or a 45-char key)",
+            "bemfa_credentials_required": "Bemfa UID, secretID and secretKey must all be filled"
         }
     }
 }

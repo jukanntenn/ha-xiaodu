@@ -18,12 +18,14 @@ from .bemfa import (
     BemfaMQTTClient,
 )
 from .bemfa.const import (
+    BEMFA_ALL_TOPIC_URL,
     BEMFA_BROKER,
     BEMFA_CHANGE_GROUP_URL,
     BEMFA_CHANGE_ROOM_URL,
     BEMFA_CREATE_TOPIC_URL,
     BEMFA_CREATE_TOPIC_V1_URL,
     BEMFA_DELETE_TOPIC_URL,
+    BEMFA_MODIFY_NAME_URL,
     BEMFA_TLS_PORT,
     BEMFA_USE_TLS,
 )
@@ -69,6 +71,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 delete_topic_url=BEMFA_DELETE_TOPIC_URL,
                 change_room_url=BEMFA_CHANGE_ROOM_URL,
                 change_group_url=BEMFA_CHANGE_GROUP_URL,
+                modify_name_url=BEMFA_MODIFY_NAME_URL,
+                all_topic_url=BEMFA_ALL_TOPIC_URL,
             )
             bemfa_mqtt = BemfaMQTTClient(
                 bemfa_uid,

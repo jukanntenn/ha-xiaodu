@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+import re
+from typing import Any, cast
 
 import voluptuous as vol
 from homeassistant import config_entries
@@ -32,6 +33,9 @@ from .const import (
 from .room_mapping import RoomMapper
 
 _LOGGER = logging.getLogger(__name__)
+
+# 巴法云 UID：32 位十六进制（新版）或 45 位字母数字/下划线/连字符
+_UID_RE = re.compile(r"^[0-9a-fA-F]{32}$|^[A-Za-z0-9_-]{45}$")
 
 
 class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -228,74 +232,121 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def async_step_bemfa(
-        self, user_input: dict[str, Any] | None = None
+        self, _user_input: dict[str, object] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """处理 Bemfa（巴法云）配置（可选）。"""
+        """处理 Bemfa（巴法云）配置——选择认证方式（可选步骤）。"""
+        return self.async_show_menu(
+            step_id="bemfa",
+            menu_options=["bemfa_v2", "bemfa_v1", "bemfa_skip"],
+        )
+
+    async def async_step_bemfa_v2(
+        self, user_input: dict[str, str] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """处理 v2 认证（实名认证，推荐）。"""
         errors: dict[str, str] = {}
         if user_input is not None:
-            bemfa_uid = user_input.get(CONF_BEMFA_UID, "").strip()
-            secret_id = user_input.get(CONF_BEMFA_SECRET_ID, "").strip()
-            secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
-            bemfa_enabled = bool(bemfa_uid)
-
-            # 校验：uid 必填时 secret 成对可选；只填一半或未填 uid 却填 secret 报错
-            if not bemfa_uid and (secret_id or secret_key):
-                errors["base"] = "bemfa_secret_required"
-            if bemfa_uid and bool(secret_id) != bool(secret_key):
-                errors["base"] = "bemfa_secret_required"
-
-            if not errors:
-                # 校验唯一性
-                await self.async_set_unique_id(f"xiaodu_{self._house_id}")
-                self._abort_if_unique_id_configured()
-
-                # 序列化设备数据，用于写入配置条目（config entry）
-                serialized_devices = [
+            uid = user_input[CONF_BEMFA_UID].strip()
+            secret_id = user_input[CONF_BEMFA_SECRET_ID].strip()
+            secret_key = user_input[CONF_BEMFA_SECRET_KEY].strip()
+            if not uid or not secret_id or not secret_key:
+                errors["base"] = "bemfa_credentials_required"
+            elif not _UID_RE.match(uid):
+                errors["base"] = "invalid_bemfa_uid"
+            else:
+                return await self._async_finish(
                     {
-                        "applianceId": d.appliance_id,
-                        "houseId": self._house_id,
-                        "cookie": self._cookie,
-                    }
-                    for d in self._devices
-                ]
-                appliance_types_list = [
-                    {"applianceTypes": d.appliance_types} for d in self._devices
-                ]
-
-                options: dict[str, Any] = {
-                    CONF_ROOM_MAPPING: self._room_mapping,
-                }
-                if bemfa_enabled:
-                    options["bemfa"] = {
                         "enabled": True,
-                        "uid": bemfa_uid,
+                        "uid": uid,
                         "secret_id": secret_id,
                         "secret_key": secret_key,
                         "sync_devices": True,
                     }
-
-                return self.async_create_entry(
-                    title=f"Xiaodu: {self._house_name}",
-                    data={
-                        CONF_COOKIE: self._cookie,
-                        CONF_HOUSE_ID: self._house_id,
-                        CONF_HOUSE_NAME: self._house_name,
-                        "devices": serialized_devices,
-                        "appliance_types": appliance_types_list,
-                    },
-                    options=options,
                 )
 
         return self.async_show_form(
-            step_id="bemfa",
+            step_id="bemfa_v2",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(CONF_BEMFA_UID, default=""): str,
-                    vol.Optional(CONF_BEMFA_SECRET_ID, default=""): str,
-                    vol.Optional(CONF_BEMFA_SECRET_KEY, default=""): str,
+                    vol.Required(CONF_BEMFA_UID): str,
+                    vol.Required(CONF_BEMFA_SECRET_ID): str,
+                    vol.Required(CONF_BEMFA_SECRET_KEY): str,
                 }
             ),
             errors=errors,
+        )
+
+    async def async_step_bemfa_v1(
+        self, user_input: dict[str, str] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """处理 v1 旧版认证（仅私钥，无需实名）。"""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            uid = user_input[CONF_BEMFA_UID].strip()
+            if not uid:
+                errors["base"] = "bemfa_credentials_required"
+            elif not _UID_RE.match(uid):
+                errors["base"] = "invalid_bemfa_uid"
+            else:
+                return await self._async_finish(
+                    {
+                        "enabled": True,
+                        "uid": uid,
+                        "secret_id": "",
+                        "secret_key": "",
+                        "sync_devices": True,
+                    }
+                )
+
+        return self.async_show_form(
+            step_id="bemfa_v1",
+            data_schema=vol.Schema({vol.Required(CONF_BEMFA_UID): str}),
+            errors=errors,
+        )
+
+    async def async_step_bemfa_skip(
+        self, _user_input: dict[str, object] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """跳过 Bemfa（巴法云）配置。"""
+        return await self._async_finish(None)
+
+    async def _async_finish(
+        self, bemfa_config: dict[str, bool | str] | None
+    ) -> config_entries.ConfigFlowResult:
+        """创建配置条目（config entry）。"""
+        # 校验唯一性
+        _ = await self.async_set_unique_id(f"xiaodu_{self._house_id}")
+        self._abort_if_unique_id_configured()
+
+        # 序列化设备数据，用于写入配置条目（config entry）
+        serialized_devices = [
+            {
+                "applianceId": d.appliance_id,
+                "houseId": self._house_id,
+                "cookie": self._cookie,
+            }
+            for d in self._devices
+        ]
+        appliance_types_list = [
+            {"applianceTypes": d.appliance_types} for d in self._devices
+        ]
+
+        options: dict[str, object] = {
+            CONF_ROOM_MAPPING: self._room_mapping,
+        }
+        if bemfa_config:
+            options["bemfa"] = bemfa_config
+
+        return self.async_create_entry(
+            title=f"Xiaodu: {self._house_name}",
+            data={
+                CONF_COOKIE: self._cookie,
+                CONF_HOUSE_ID: self._house_id,
+                CONF_HOUSE_NAME: self._house_name,
+                "devices": serialized_devices,
+                "appliance_types": appliance_types_list,
+            },
+            options=options,
         )
 
     async def async_step_reauth(
@@ -386,32 +437,38 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_bemfa(
-        self, user_input: dict[str, Any] | None = None
+        self, _user_input: dict[str, object] | None = None
     ) -> config_entries.ConfigFlowResult:
-        """处理 Bemfa（巴法云）配置的修改。"""
+        """处理 Bemfa（巴法云）配置的修改——选择认证方式或禁用。"""
+        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
+        menu_options = ["bemfa_v2", "bemfa_v1"]
+        if current_bemfa.get("enabled"):
+            menu_options.append("bemfa_disable")
+        return self.async_show_menu(
+            step_id="bemfa",
+            menu_options=menu_options,
+        )
+
+    async def async_step_bemfa_v2(
+        self, user_input: dict[str, str] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """处理 v2 认证配置的修改。"""
         errors: dict[str, str] = {}
-        current_bemfa = self.config_entry.options.get("bemfa", {})
-        current_secret_id = current_bemfa.get("secret_id", "")
-        current_secret_key = current_bemfa.get("secret_key", "")
-
+        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
         if user_input is not None:
-            bemfa_uid = user_input.get(CONF_BEMFA_UID, "").strip()
-            secret_id = user_input.get(CONF_BEMFA_SECRET_ID, "").strip()
-            secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
-            bemfa_enabled = bool(bemfa_uid)
-
-            # 校验：uid 必填时 secret 成对可选；只填一半或未填 uid 却填 secret 报错
-            if not bemfa_uid and (secret_id or secret_key):
-                errors["base"] = "bemfa_secret_required"
-            if bemfa_uid and bool(secret_id) != bool(secret_key):
-                errors["base"] = "bemfa_secret_required"
-
-            if not errors:
+            uid = user_input[CONF_BEMFA_UID].strip()
+            secret_id = user_input[CONF_BEMFA_SECRET_ID].strip()
+            secret_key = user_input[CONF_BEMFA_SECRET_KEY].strip()
+            if not uid or not secret_id or not secret_key:
+                errors["base"] = "bemfa_credentials_required"
+            elif not _UID_RE.match(uid):
+                errors["base"] = "invalid_bemfa_uid"
+            else:
                 options = {
                     **self.config_entry.options,
                     "bemfa": {
-                        "enabled": bemfa_enabled,
-                        "uid": bemfa_uid,
+                        "enabled": True,
+                        "uid": uid,
                         "secret_id": secret_id,
                         "secret_key": secret_key,
                         "sync_devices": True,
@@ -420,20 +477,77 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
                 return self.async_create_entry(title="", data=options)
 
         return self.async_show_form(
-            step_id="bemfa",
+            step_id="bemfa_v2",
             data_schema=vol.Schema(
                 {
-                    vol.Optional(
+                    vol.Required(
                         CONF_BEMFA_UID, default=current_bemfa.get("uid", "")
                     ): str,
-                    vol.Optional(CONF_BEMFA_SECRET_ID, default=current_secret_id): str,
-                    vol.Optional(
-                        CONF_BEMFA_SECRET_KEY, default=current_secret_key
+                    vol.Required(
+                        CONF_BEMFA_SECRET_ID,
+                        default=current_bemfa.get("secret_id", ""),
+                    ): str,
+                    vol.Required(
+                        CONF_BEMFA_SECRET_KEY,
+                        default=current_bemfa.get("secret_key", ""),
                     ): str,
                 }
             ),
             errors=errors,
         )
+
+    async def async_step_bemfa_v1(
+        self, user_input: dict[str, str] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """处理 v1 认证配置的修改。"""
+        errors: dict[str, str] = {}
+        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
+        if user_input is not None:
+            uid = user_input[CONF_BEMFA_UID].strip()
+            if not uid:
+                errors["base"] = "bemfa_credentials_required"
+            elif not _UID_RE.match(uid):
+                errors["base"] = "invalid_bemfa_uid"
+            else:
+                options = {
+                    **self.config_entry.options,
+                    "bemfa": {
+                        "enabled": True,
+                        "uid": uid,
+                        "secret_id": "",
+                        "secret_key": "",
+                        "sync_devices": True,
+                    },
+                }
+                return self.async_create_entry(title="", data=options)
+
+        return self.async_show_form(
+            step_id="bemfa_v1",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_BEMFA_UID, default=current_bemfa.get("uid", "")
+                    ): str,
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_bemfa_disable(
+        self, _user_input: dict[str, object] | None = None
+    ) -> config_entries.ConfigFlowResult:
+        """禁用 Bemfa（巴法云）同步。"""
+        options = {
+            **self.config_entry.options,
+            "bemfa": {
+                "enabled": False,
+                "uid": "",
+                "secret_id": "",
+                "secret_key": "",
+                "sync_devices": False,
+            },
+        }
+        return self.async_create_entry(title="", data=options)
 
     async def async_step_reauth(
         self, user_input: dict[str, Any] | None = None
