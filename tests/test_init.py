@@ -5,8 +5,9 @@ Uses aioclient_mock to drive real XiaoduAPI execution (flo paradigm).
 
 from __future__ import annotations
 
+import asyncio
+import time
 from typing import Any
-from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
@@ -14,8 +15,21 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.xiaodu.bemfa.sync_manager import DeviceMapping
+from tests.conftest import MqttBrokerHandle
 
 DELETE_TOPIC_URL = "https://pro.bemfa.com/v1/deleteTopic"
+
+
+def _wait_for_sessions(
+    broker: MqttBrokerHandle, expected: int, timeout_seconds: float
+) -> bool:
+    """在线程中轮询 broker 会话数（避免 asyncio 轮询 lint）。"""
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        if broker.sessions == expected:
+            return True
+        time.sleep(0.05)
+    return False
 
 
 async def test_setup_entry(
@@ -72,6 +86,7 @@ async def test_unload_with_bemfa_cleans_up_topics(
     mock_config_entry_with_bemfa: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
     aioclient_mock_fixture: None,
+    bemfa_mqtt_redirect: MqttBrokerHandle,
 ) -> None:
     """Test unloading with Bemfa enabled deletes all mapped topics.
 
@@ -101,13 +116,8 @@ async def test_unload_with_bemfa_cleans_up_topics(
     aioclient_mock.post(DELETE_TOPIC_URL, json={"code": 0, "msg": "success"})
     aioclient_mock.mock_calls.clear()
 
-    # MQTT disconnect runs off the event loop; stub it so the test does not
-    # touch a real broker.
-    with patch.object(coordinator.bemfa_sync_manager._mqtt_client, "disconnect"):
-        assert await hass.config_entries.async_unload(
-            mock_config_entry_with_bemfa.entry_id
-        )
-        await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(mock_config_entry_with_bemfa.entry_id)
+    await hass.async_block_till_done()
 
     assert mock_config_entry_with_bemfa.state is ConfigEntryState.NOT_LOADED
 
@@ -121,6 +131,8 @@ async def test_unload_with_bemfa_cleans_up_topics(
     assert {"topic_a", "topic_b"} <= deleted_topics
     # The mapping should be empty after cleanup.
     assert coordinator.bemfa_sync_manager.device_mapping == {}
+    # 真实断开：broker 上只剩探针会话（本测试未启用探针，因此为 0）。
+    assert await asyncio.to_thread(_wait_for_sessions, bemfa_mqtt_redirect, 0, 3.0)
 
 
 async def test_unload_with_bemfa_disconnects_when_topic_cleanup_fails(
@@ -128,6 +140,7 @@ async def test_unload_with_bemfa_disconnects_when_topic_cleanup_fails(
     mock_config_entry_with_bemfa: MockConfigEntry,
     aioclient_mock: AiohttpClientMocker,
     aioclient_mock_fixture: None,
+    bemfa_mqtt_redirect: MqttBrokerHandle,
 ) -> None:
     """Test unload still disconnects MQTT when topic cleanup fails.
 
@@ -155,12 +168,8 @@ async def test_unload_with_bemfa_disconnects_when_topic_cleanup_fails(
 
     aioclient_mock.post(DELETE_TOPIC_URL, side_effect=_topic_cleanup_failure)
 
-    with patch.object(
-        coordinator.bemfa_sync_manager._mqtt_client, "disconnect"
-    ) as mock_disconnect:
-        assert await hass.config_entries.async_unload(
-            mock_config_entry_with_bemfa.entry_id
-        )
-        await hass.async_block_till_done()
+    assert await hass.config_entries.async_unload(mock_config_entry_with_bemfa.entry_id)
+    await hass.async_block_till_done()
 
-    mock_disconnect.assert_called_once()
+    # 清理失败也必须断开 MQTT：broker 会话归零。
+    assert await asyncio.to_thread(_wait_for_sessions, bemfa_mqtt_redirect, 0, 3.0)

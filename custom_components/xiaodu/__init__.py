@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -12,12 +11,21 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_validation import config_entry_only_config_schema
 from homeassistant.helpers.device_registry import DeviceEntry
 
-from .api.xiaodu_client import XiaoduAPI
+from .api.xiaodu_client import HOST, XiaoduAPI
 from .bemfa import (
     BemfaAPIClient,
     BemfaDeviceSyncManager,
     BemfaMQTTClient,
-    BemfaStatePublisher,
+)
+from .bemfa.const import (
+    BEMFA_BROKER,
+    BEMFA_CHANGE_GROUP_URL,
+    BEMFA_CHANGE_ROOM_URL,
+    BEMFA_CREATE_TOPIC_URL,
+    BEMFA_CREATE_TOPIC_V1_URL,
+    BEMFA_DELETE_TOPIC_URL,
+    BEMFA_TLS_PORT,
+    BEMFA_USE_TLS,
 )
 from .const import (
     CONF_COOKIE,
@@ -41,7 +49,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     cookie = entry.data[CONF_COOKIE]
 
     session = async_get_clientsession(hass)
-    api_client = XiaoduAPI(cookie, session)
+    api_client = XiaoduAPI(cookie, session, host=HOST)
 
     # 如已启用，则创建 Bemfa（巴法云）相关组件
     bemfa_sync_manager: BemfaDeviceSyncManager | None = None
@@ -56,16 +64,61 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 session,
                 secret_id=secret_id,
                 secret_key=secret_key,
+                create_topic_url=BEMFA_CREATE_TOPIC_URL,
+                create_topic_v1_url=BEMFA_CREATE_TOPIC_V1_URL,
+                delete_topic_url=BEMFA_DELETE_TOPIC_URL,
+                change_room_url=BEMFA_CHANGE_ROOM_URL,
+                change_group_url=BEMFA_CHANGE_GROUP_URL,
             )
-            bemfa_mqtt = BemfaMQTTClient(bemfa_uid)
-            bemfa_publisher = BemfaStatePublisher(bemfa_mqtt)
+            bemfa_mqtt = BemfaMQTTClient(
+                bemfa_uid,
+                host=BEMFA_BROKER,
+                port=BEMFA_TLS_PORT,
+                use_tls=BEMFA_USE_TLS,
+            )
+
+            def _mqtt_message_received(topic: str, payload: str) -> None:
+                """paho 线程回调：切回 HA 事件循环执行下行指令。"""
+
+                async def _handle() -> None:
+                    _LOGGER.debug(
+                        "Bemfa MQTT downlink: topic=%s payload=%s", topic, payload
+                    )
+                    coordinator = cast(XiaoduCoordinator, entry.runtime_data)
+                    if not coordinator.bemfa_sync_manager:
+                        return
+                    appliance_id = (
+                        coordinator.bemfa_sync_manager.get_appliance_id_by_topic(topic)
+                    )
+                    if appliance_id is None:
+                        _LOGGER.debug(
+                            "Bemfa MQTT downlink ignored: no mapping for %s", topic
+                        )
+                        return
+                    mapping = coordinator.bemfa_sync_manager.device_mapping[
+                        appliance_id
+                    ]
+                    from .bemfa.protocol import parse_command
+
+                    commands = parse_command(mapping.device_type, payload)
+                    _LOGGER.debug(
+                        "Bemfa MQTT downlink commands: %s", commands
+                    )
+                    if commands:
+                        await coordinator.handle_bemfa_command(appliance_id, commands)
+
+                hass.loop.call_soon_threadsafe(
+                    lambda: hass.async_create_task(_handle())
+                )
+
+            bemfa_mqtt.set_on_message_callback(_mqtt_message_received)
             bemfa_sync_manager = BemfaDeviceSyncManager(
-                bemfa_uid, bemfa_api, bemfa_mqtt, bemfa_publisher
+                bemfa_uid, bemfa_api, bemfa_mqtt
             )
-            try:
-                await asyncio.to_thread(bemfa_mqtt.connect)
-            except Exception:
-                _LOGGER.exception("Failed to connect to Bemfa MQTT broker")
+            if not await bemfa_mqtt.async_connect(timeout_seconds=5.0):
+                _LOGGER.warning(
+                    "Bemfa MQTT unavailable; state reporting will be delayed"
+                )
 
     coordinator = XiaoduCoordinator(hass, entry, api_client, bemfa_sync_manager)
 
@@ -85,6 +138,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         coordinator: XiaoduCoordinator = entry.runtime_data
+        await coordinator.async_cancel_background_tasks()
         if coordinator.bemfa_sync_manager:
             # 在事件循环之外删除 Bemfa 主题（topic）并断开 MQTT 连接。
             # 主题删除失败仅记录日志，不会阻塞卸载流程——

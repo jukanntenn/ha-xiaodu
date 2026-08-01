@@ -80,6 +80,7 @@ async def test_diagnostics_redacts_bemfa_secrets(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
     mock_config_entry_with_bemfa: MockConfigEntry,
+    bemfa_mqtt_redirect,
 ) -> None:
     """Test diagnostics redacts bemfa secret_id/secret_key in options."""
     mock_config_entry_with_bemfa.add_to_hass(hass)
@@ -102,6 +103,7 @@ async def test_diagnostics_includes_sync_error(
     hass: HomeAssistant,
     hass_client: ClientSessionGenerator,
     mock_config_entry_with_bemfa: MockConfigEntry,
+    bemfa_mqtt_redirect,
 ) -> None:
     """Test diagnostics exports DeviceMapping.sync_error."""
     mock_config_entry_with_bemfa.add_to_hass(hass)
@@ -126,3 +128,25 @@ async def test_diagnostics_includes_sync_error(
     assert "dev_err" in bemfa_data
     assert bemfa_data["dev_err"]["sync_error"] == "参数错误"
     assert bemfa_data["dev_err"]["sync_status"] == "error"
+
+
+@pytest.mark.usefixtures("aioclient_mock_fixture")
+async def test_diagnostics_includes_mqtt_and_api_version(
+    hass: HomeAssistant,
+    hass_client: ClientSessionGenerator,
+    mock_config_entry_with_bemfa: MockConfigEntry,
+    bemfa_mqtt_redirect,
+) -> None:
+    """诊断输出包含 MQTT 连接状态与接口版本。"""
+    mock_config_entry_with_bemfa.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry_with_bemfa.entry_id)
+    await hass.async_block_till_done()
+
+    diag = await get_diagnostics_for_config_entry(
+        hass, hass_client, mock_config_entry_with_bemfa
+    )
+
+    bemfa_data = diag.get("bemfa", {})
+    assert "mqtt_connected" in bemfa_data
+    assert bemfa_data["api_version"] == "v2"
+    assert "unsupported_devices" in bemfa_data

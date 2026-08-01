@@ -11,18 +11,12 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
-
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
 
-from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.const import (
     CONF_BEMFA_SECRET_ID,
     CONF_BEMFA_SECRET_KEY,
@@ -42,53 +36,11 @@ from tests.const import (
     TEST_COOKIE,
     TEST_HOUSE_ID,
 )
-from tests.test_e2e.conftest import DeviceListSideEffect, register_bemfa_endpoints
+from tests.test_e2e.conftest import ApiServer
 
 # All rooms for the selected device (appliance_test_light_001 is in 次卧)
 DEVICE_ROOM = "次卧"
 ROOM_MAPPING = {DEVICE_ROOM: DEVICE_ROOM}
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _register_all_endpoints(
-    aioclient_mock: AiohttpClientMocker,
-    *,
-    device_list=None,
-    device_list_side_effect=None,
-) -> None:
-    """Register all Xiaodu API endpoints + Bemfa HTTP endpoints."""
-    aioclient_mock.post(
-        f"{HOST}/appserver/gateway/app/v1",
-        json=load_json_fixture("check_session_ok.json"),
-    )
-    aioclient_mock.post(
-        f"{HOST}/saiya/smarthome/multihouse",
-        json=load_json_fixture("home_list.json"),
-    )
-    if device_list_side_effect:
-        aioclient_mock.post(
-            f"{HOST}/saiya/smarthome/appliance",
-            side_effect=device_list_side_effect,
-        )
-    else:
-        aioclient_mock.post(
-            f"{HOST}/saiya/smarthome/appliance",
-            json=device_list or load_json_fixture("device_list.json"),
-        )
-    aioclient_mock.get(
-        f"{HOST}/saiya/smarthome/appliancedetails",
-        json=load_json_fixture("device_detail_light.json"),
-    )
-    aioclient_mock.get(
-        f"{HOST}/saiya/smarthome/directivesend",
-        json=load_json_fixture("control_response_ok.json"),
-    )
-    # Register Bemfa HTTP endpoints for when Bemfa is enabled
-    register_bemfa_endpoints(aioclient_mock)
 
 
 async def _run_config_flow_to_bemfa(
@@ -156,7 +108,8 @@ def _make_bemfa_config_entry(hass: HomeAssistant) -> MockConfigEntry:
 
 async def test_scenario_1_full_config_flow_and_setup(
     hass: HomeAssistant,
-    aioclient_mock_fixture: None,
+    api_server: ApiServer,
+    bemfa_mqtt_redirect,
 ) -> None:
     """Config flow 全步骤 → setup → 各类设备实体出现并状态正确。
 
@@ -221,7 +174,8 @@ async def test_scenario_1_full_config_flow_and_setup(
 
 async def test_scenario_2_polling_discovers_new_device(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    api_server: ApiServer,
+    bemfa_mqtt_redirect,
 ) -> None:
     """轮询发现新设备 → 新实体出现 + 巴法云主题创建。
 
@@ -231,11 +185,6 @@ async def test_scenario_2_polling_discovers_new_device(
     - New switch entity appears
     - Bemfa HTTP endpoints are called (create_topic, change_topic_room)
     """
-    _register_all_endpoints(
-        aioclient_mock,
-        device_list_side_effect=DeviceListSideEffect("device_list_added.json"),
-    )
-
     entry = _make_bemfa_config_entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -244,6 +193,10 @@ async def test_scenario_2_polling_discovers_new_device(
     initial_count = len(coordinator.data)
 
     # Trigger poll → returns device_list_added
+    api_server.set_response(
+        "/saiya/smarthome/appliance",
+        json=load_json_fixture("device_list_added.json"),
+    )
     await coordinator.async_refresh()
     await hass.async_block_till_done()
 
@@ -258,11 +211,11 @@ async def test_scenario_2_polling_discovers_new_device(
 
     # Bemfa sync was triggered: create_topic HTTP request was sent with the
     # secretID/secretKey credentials (regression guard for requirement 5).
-    create_calls = [c for c in aioclient_mock.mock_calls if "createTopic" in str(c[1])]
+    create_calls = [
+        r for r in api_server.requests if r["path"] == "/vs/web/v2/createTopic"
+    ]
     assert len(create_calls) > 0
-    # mock_calls tuple is (method, url, data, headers); data holds the JSON body.
-    create_body = create_calls[0][2]
-    assert create_body is not None
+    create_body = create_calls[0]["body"]
     assert "secretID" in create_body
     assert "secretKey" in create_body
     assert create_body["secretID"] == TEST_BEMFA_SECRET_ID
@@ -276,7 +229,9 @@ async def test_scenario_2_polling_discovers_new_device(
 
 async def test_scenario_3_polling_discovers_state_change(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    api_server: ApiServer,
+    bemfa_mqtt_redirect,
+    bemfa_mqtt_probe,
 ) -> None:
     """轮询发现状态变化 → entity 状态更新 + 巴法云状态发布。
 
@@ -285,11 +240,6 @@ async def test_scenario_3_polling_discovers_state_change(
     - Entity state updates accordingly
     - Bemfa update_device_state is called (HTTP to Bemfa control endpoint)
     """
-    _register_all_endpoints(
-        aioclient_mock,
-        device_list_side_effect=DeviceListSideEffect("device_list_state_changed.json"),
-    )
-
     entry = _make_bemfa_config_entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -304,32 +254,30 @@ async def test_scenario_3_polling_discovers_state_change(
     )
     assert initial_state == "OFF"
 
-    # Patch BemfaMQTTClient.publish to capture the state-change publish,
-    # then trigger poll → returns state_changed fixture (light_001 = ON).
-    with patch(
-        "custom_components.xiaodu.bemfa.mqtt_client.BemfaMQTTClient.publish"
-    ) as mock_publish:
-        await coordinator.async_refresh()
-        await hass.async_block_till_done()
+    # Trigger poll → returns state_changed fixture (light_001 = ON)
+    api_server.set_response(
+        "/saiya/smarthome/appliance",
+        json=load_json_fixture("device_list_state_changed.json"),
+    )
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
 
-        # Verify state was refreshed
-        new_state = (
-            coordinator.data["appliance_test_light_001"]
-            .state_setting.get("turnOnState", {})
-            .get("value")
-        )
-        assert new_state == "ON"
+    # Verify state was refreshed
+    new_state = (
+        coordinator.data["appliance_test_light_001"]
+        .state_setting.get("turnOnState", {})
+        .get("value")
+    )
+    assert new_state == "ON"
 
-        # Bemfa state-change publish was triggered for light_001 with a
-        # payload carrying the new turnOnState (regression guard for the
-        # state-change → MQTT publish path).
-        publish_calls = [
-            c for c in mock_publish.call_args_list if c.args[0].endswith("/up")
-        ]
-        assert len(publish_calls) > 0
-        payload = publish_calls[0].args[1]
-        assert payload is not None
-        assert "turnOnState" in payload
+    # 状态变化通过真实 broker 上报（wire 断言：{topic}/up = "on"）
+    mapping = coordinator.bemfa_sync_manager.device_mapping[
+        "appliance_test_light_001"
+    ]
+    _up_topic, payload = await bemfa_mqtt_probe.wait_for(
+        lambda t, p: t == f"{mapping.bemfa_topic}/up" and p == "on"
+    )
+    assert payload == "on"
 
 
 # ---------------------------------------------------------------------------
@@ -339,7 +287,8 @@ async def test_scenario_3_polling_discovers_state_change(
 
 async def test_scenario_4_control_device(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    api_server: ApiServer,
+    bemfa_mqtt_redirect,
 ) -> None:
     """控制设备 → 断言 HTTP 命令体 + 巴法云同步。
 
@@ -349,8 +298,6 @@ async def test_scenario_4_control_device(
     - Entity state updates via optimistic update
     - Bemfa HTTP calls are made after control
     """
-    _register_all_endpoints(aioclient_mock)
-
     entry = _make_bemfa_config_entry(hass)
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
@@ -358,8 +305,8 @@ async def test_scenario_4_control_device(
     # Verify initial state is off
     assert hass.states.get("light.test_light_1").state == "off"
 
-    # Clear previous mock calls to isolate control command
-    aioclient_mock.mock_calls.clear()
+    # 记录当前请求数，用于隔离控制命令
+    request_count = len(api_server.requests)
 
     # Turn on the light
     await hass.services.async_call(
@@ -375,11 +322,12 @@ async def test_scenario_4_control_device(
 
     # HTTP command was sent to directivesend
     control_calls = [
-        c for c in aioclient_mock.mock_calls if "directivesend" in str(c[1])
+        r
+        for r in api_server.requests[request_count:]
+        if r["path"] == "/saiya/smarthome/directivesend"
     ]
     assert len(control_calls) > 0
-    # Verify the command body contains TurnOnRequest
-    call_data = control_calls[0][2]  # (method, url, data, headers)
+    call_data = control_calls[0]["body"]
     assert call_data is not None
     assert call_data["header"]["name"] == "TurnOnRequest"
 
@@ -391,7 +339,7 @@ async def test_scenario_4_control_device(
 
 async def test_scenario_5_cookie_expired_reauth(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    api_server: ApiServer,
 ) -> None:
     """Cookie 过期 → 触发 reauth → 重新配置恢复。
 
@@ -401,8 +349,6 @@ async def test_scenario_5_cookie_expired_reauth(
     - Reauth flow can be initiated
     - After reauth with new cookie, entry recovers
     """
-    _register_all_endpoints(aioclient_mock)
-
     entry = MockConfigEntry(
         domain=DOMAIN,
         title="Xiaodu: Test Home",
@@ -419,11 +365,10 @@ async def test_scenario_5_cookie_expired_reauth(
     assert entry.state is ConfigEntryState.LOADED
 
     # Now replace device_list endpoint to return auth error
-    aioclient_mock.clear_requests()
-    aioclient_mock.post(
-        f"{HOST}/saiya/smarthome/appliance",
-        json={"status": 2, "msg": "user.not login", "data": {}},
+    api_server.set_response(
+        "/saiya/smarthome/appliance",
         status=401,
+        json={"status": 2, "msg": "user.not login", "data": {}},
     )
 
     # Trigger poll → auth failure
@@ -432,8 +377,10 @@ async def test_scenario_5_cookie_expired_reauth(
     await hass.async_block_till_done()
 
     # Initiate reauth flow
-    aioclient_mock.clear_requests()
-    _register_all_endpoints(aioclient_mock)
+    api_server.set_response(
+        "/saiya/smarthome/appliance",
+        json=load_json_fixture("device_list.json"),
+    )
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN,
@@ -462,66 +409,36 @@ async def test_scenario_5_cookie_expired_reauth(
 
 async def test_scenario_6_bemfa_mqtt_publish(
     hass: HomeAssistant,
-    aioclient_mock: AiohttpClientMocker,
+    api_server: ApiServer,
+    bemfa_mqtt_redirect,
+    bemfa_mqtt_probe,
 ) -> None:
-    """HA 控制设备 → 巴法云 MQTT publish 被调用, topic 和 payload 正确。
+    """HA 控制设备 → 巴法云真实收到 {topic}/up 状态。
 
     Verifies:
-    - Control triggers BemfaMQTTClient.publish
-    - Published topic is {bemfa_topic}/up
-    - Published payload contains correct state
+    - Control publishes {bemfa_topic}/up over the real broker
+    - Payload is the official #-text state ("on")
     """
-    _register_all_endpoints(aioclient_mock)
-
     entry = _make_bemfa_config_entry(hass)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
 
-    # Patch BemfaMQTTClient.publish to capture calls
-    with patch(
-        "custom_components.xiaodu.bemfa.mqtt_client.BemfaMQTTClient.publish"
-    ) as mock_publish:
-        assert await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
+    coordinator = entry.runtime_data
+    mapping = coordinator.bemfa_sync_manager.device_mapping[
+        "appliance_test_light_001"
+    ]
+    assert mapping.bemfa_topic is not None
 
-        coordinator = entry.runtime_data
+    # Turn on the light → 乐观更新 → 真实 MQTT 上报
+    await hass.services.async_call(
+        "light",
+        "turn_on",
+        {"entity_id": "light.test_light_1"},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
 
-        # Ensure sync_manager has a device mapping for the light
-        # (normally populated during sync_devices)
-        from custom_components.xiaodu.bemfa.sync_manager import DeviceMapping
-
-        coordinator.bemfa_sync_manager._device_mapping["appliance_test_light_001"] = (
-            DeviceMapping(
-                xiaodu_appliance_id="appliance_test_light_001",
-                bemfa_topic="test_topic_002",
-                device_type="LIGHT",
-                friendly_name="Test Light 1",
-                room_name=DEVICE_ROOM,
-            )
-        )
-
-        # Clear previous publish calls
-        mock_publish.reset_mock()
-
-        # Turn on the light
-        await hass.services.async_call(
-            "light",
-            "turn_on",
-            {"entity_id": "light.test_light_1"},
-            blocking=True,
-        )
-        await hass.async_block_till_done()
-
-        # BemfaMQTTClient.publish was called
-        assert mock_publish.call_count > 0
-
-        # Verify the publish call: topic should be {topic}/up
-        last_call = mock_publish.call_args
-        topic = last_call.args[0]
-        assert topic == "test_topic_002/up"
-
-        # Verify payload is non-empty and carries the device state (the
-        # turn_on optimistic update should set turnOnState). This is a
-        # regression guard for the HA-control → MQTT publish path.
-        payload = last_call.args[1]
-        assert payload is not None
-        assert isinstance(payload, dict)
-        assert "turnOnState" in payload
+    _up_topic, payload = await bemfa_mqtt_probe.wait_for(
+        lambda t, p: t == f"{mapping.bemfa_topic}/up" and p == "on"
+    )
+    assert payload == "on"

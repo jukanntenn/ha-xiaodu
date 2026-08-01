@@ -28,16 +28,20 @@ RETRY_DELAYS = [1, 2, 4]
 class XiaoduAPI:
     """Xiaodu API 客户端。"""
 
-    def __init__(self, cookie: str, session: ClientSession) -> None:
+    def __init__(
+        self, cookie: str, session: ClientSession, host: str | None = None
+    ) -> None:
         """初始化 API 客户端。
 
         Args:
             cookie: 百度 BDUSS Cookie。
             session: aiohttp 客户端会话（client session）。
+            host: API 主机；None 时使用模块常量 HOST（调用时解析，便于测试重定向）。
         """
-        self._cookie = cookie
-        self._session = session
-        self._headers = self._build_headers()
+        self._cookie: str = cookie
+        self._session: ClientSession = session
+        self._host: str = host or HOST
+        self._headers: dict[str, str] = self._build_headers()
 
     def _build_headers(self) -> dict[str, str]:
         """构建通用请求头（headers）。"""
@@ -172,7 +176,7 @@ class XiaoduAPI:
         }
         await self._request_with_retry(
             "post",
-            f"{HOST}/appserver/gateway/app/v1",
+            f"{self._host}/appserver/gateway/app/v1",
             json=submit,
             headers=self._headers,
         )
@@ -190,7 +194,7 @@ class XiaoduAPI:
         submit = {"method": "HOUSE_LIST"}
         data = await self._request_with_retry(
             "post",
-            f"{HOST}/saiya/smarthome/multihouse",
+            f"{self._host}/saiya/smarthome/multihouse",
             json=submit,
             headers=self._headers,
         )
@@ -222,7 +226,7 @@ class XiaoduAPI:
         }
         data = await self._request_with_retry(
             "post",
-            f"{HOST}/saiya/smarthome/appliance",
+            f"{self._host}/saiya/smarthome/appliance",
             json=submit,
             headers=self._headers,
             cookies={"HOUSE_ID": house_id},
@@ -262,7 +266,7 @@ class XiaoduAPI:
         }
         data = await self._request_with_retry(
             "get",
-            f"{HOST}/saiya/smarthome/appliancedetails",
+            f"{self._host}/saiya/smarthome/appliancedetails",
             headers=self._headers,
             json=submit,
         )
@@ -298,7 +302,7 @@ class XiaoduAPI:
         submit = self._build_command_payload(appliance_id, command)
         await self._request_with_retry(
             "get",
-            f"{HOST}/saiya/smarthome/directivesend?from=h5_control",
+            f"{self._host}/saiya/smarthome/directivesend?from=h5_control",
             headers=self._headers,
             json=submit,
         )

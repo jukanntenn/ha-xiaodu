@@ -10,8 +10,9 @@ from dataclasses import dataclass, field
 from ..api.xiaodu_types import Device
 from ..const import DEVICE_TYPE_SUFFIX_MAP
 from .api_client import BemfaAPIClient
+from .const import BEMFA_RETRY_INTERVAL_SECONDS
 from .mqtt_client import BemfaMQTTClient
-from .state_publisher import BemfaStatePublisher
+from .protocol import encode_state
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -42,7 +43,6 @@ class BemfaDeviceSyncManager:
         bemfa_uid: str,
         api_client: BemfaAPIClient,
         mqtt_client: BemfaMQTTClient,
-        state_publisher: BemfaStatePublisher,
     ) -> None:
         """初始化同步管理器。
 
@@ -50,18 +50,44 @@ class BemfaDeviceSyncManager:
             bemfa_uid: 巴法云（Bemfa）的 UID。
             api_client: 巴法云 HTTP API 客户端。
             mqtt_client: 巴法云 MQTT 客户端。
-            state_publisher: 巴法云状态发布器。
         """
         self._bemfa_uid = bemfa_uid
         self._api_client = api_client
         self._mqtt_client = mqtt_client
-        self._state_publisher = state_publisher
         self._device_mapping: dict[str, DeviceMapping] = {}
+        self._unsupported_devices: dict[str, list[str]] = {}
 
     @property
     def device_mapping(self) -> dict[str, DeviceMapping]:
         """返回设备映射。"""
         return dict(self._device_mapping)
+
+    @property
+    def api_client(self) -> BemfaAPIClient:
+        """巴法云 HTTP API 客户端。"""
+        return self._api_client
+
+    @property
+    def api_version(self) -> str:
+        """当前生效的巴法云接口版本。"""
+        return self._api_client.api_version
+
+    @property
+    def unsupported_devices(self) -> dict[str, list[str]]:
+        """因类型不支持而未同步的设备（appliance_id -> types）。"""
+        return dict(self._unsupported_devices)
+
+    @property
+    def mqtt_connected(self) -> bool:
+        """MQTT 是否已连接。"""
+        return self._mqtt_client.is_connected()
+
+    def get_appliance_id_by_topic(self, topic: str) -> str | None:
+        """按巴法云 topic 反查小度 appliance_id。"""
+        for appliance_id, mapping in self._device_mapping.items():
+            if mapping.bemfa_topic == topic:
+                return appliance_id
+        return None
 
     async def async_disconnect(self) -> None:
         """脱离事件循环断开底层 MQTT 客户端。
@@ -112,12 +138,26 @@ class BemfaDeviceSyncManager:
             room_mapping: 房间映射 {xiaodu_room: ha_area}。
         """
         current_ids = {d.appliance_id for d in devices}
+        self._unsupported_devices = {
+            d.appliance_id: list(d.appliance_types)
+            for d in devices
+            if self._get_primary_type(d.appliance_types) is None
+        }
         mapped_ids = set(self._device_mapping.keys())
 
-        # 新增的设备
+        # 新增的设备 + 退避到期的失败设备
         new_ids = current_ids - mapped_ids
+        retry_ids = set(new_ids)
+        for appliance_id, mapping in self._device_mapping.items():
+            if (
+                mapping.sync_status == "error"
+                and time.time() - mapping.last_sync_time
+                >= BEMFA_RETRY_INTERVAL_SECONDS
+            ):
+                retry_ids.add(appliance_id)
+
         for device in devices:
-            if device.appliance_id in new_ids:
+            if device.appliance_id in retry_ids:
                 await self._add_device(device, room_mapping)
 
         # 移除的设备
@@ -144,24 +184,30 @@ class BemfaDeviceSyncManager:
         mapped_room = room_mapping.get(device.room_name, device.room_name)
         nickname = self._generate_nickname(device, room_mapping)
 
-        success, error_msg = await self._api_client.create_topic(topic, nickname)
-        if success:
+        result = await self._api_client.create_topic(topic, nickname)
+        created = result.success
+        if created:
             await self._api_client.change_topic_room([topic], mapped_room)
             await self._api_client.change_topic_group([topic], mapped_room)
+            self._mqtt_client.subscribe(topic)
 
         self._device_mapping[device.appliance_id] = DeviceMapping(
             xiaodu_appliance_id=device.appliance_id,
             ha_unique_id=f"xiaodu_{device.appliance_id}",
             ha_entity_id="",
-            bemfa_topic=topic,
+            bemfa_topic=topic if created else None,
             bemfa_nickname=nickname,
             bemfa_room=mapped_room,
             device_type=device_type,
             friendly_name=device.friendly_name,
             room_name=device.room_name,
             last_sync_time=time.time(),
-            sync_status="synced" if success else "error",
-            sync_error=error_msg,
+            sync_status=(
+                "synced"
+                if created
+                else "permanent_error" if result.code == 40009 else "error"
+            ),
+            sync_error=result.error_msg,
         )
         _LOGGER.info("Added Bemfa device: %s -> %s", device.appliance_id, topic)
 
@@ -176,24 +222,33 @@ class BemfaDeviceSyncManager:
             return
         if mapping.bemfa_topic:
             await self._api_client.delete_topic(mapping.bemfa_topic)
+            self._mqtt_client.unsubscribe(mapping.bemfa_topic)
         del self._device_mapping[appliance_id]
         _LOGGER.info("Removed Bemfa device: %s", appliance_id)
 
-    async def update_device_state(self, appliance_id: str, state: dict) -> None:
+    async def update_device_state(self, appliance_id: str, state: dict) -> bool:
         """更新巴法云上的设备状态。
 
         Args:
             appliance_id: 小度 appliance ID。
             state: 新的状态字典。
+
+        Returns:
+            发布成功返回 True；未映射/未连接/无法编码返回 False。
         """
         mapping = self._device_mapping.get(appliance_id)
-        if not mapping or not mapping.bemfa_topic:
-            return
-        await asyncio.to_thread(
-            self._state_publisher.publish_device_state, mapping.bemfa_topic, state
+        if not mapping or not mapping.bemfa_topic or not mapping.device_type:
+            return False
+        payload = encode_state(mapping.device_type, state)
+        if payload is None:
+            return False
+        published = await asyncio.to_thread(
+            self._mqtt_client.publish, f"{mapping.bemfa_topic}/up", payload
         )
-        mapping.last_sync_time = time.time()
-        mapping.sync_status = "synced"
+        if published:
+            mapping.last_sync_time = time.time()
+            mapping.sync_status = "synced"
+        return published
 
     @staticmethod
     def _generate_topic(appliance_id: str, device_type: str) -> str:

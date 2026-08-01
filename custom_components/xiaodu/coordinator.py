@@ -134,7 +134,7 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
             old_device = self.data.get(device_id)
             if old_device and old_device.state_setting != new_device.state_setting:
                 try:
-                    await self.bemfa_sync_manager.update_device_state(
+                    _ = await self.bemfa_sync_manager.update_device_state(
                         device_id, new_device.state_setting
                     )
                 except Exception:
@@ -173,6 +173,62 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
 
         return result
 
+    async def handle_bemfa_command(
+        self, appliance_id: str, commands: list[Command]
+    ) -> None:
+        """执行巴法云下行指令；setTemperature 由本地温度循环逼近。"""
+        if not commands:
+            return
+        for command in commands:
+            if command.action == "setTemperature":
+                await self._adjust_temperature(appliance_id, command.params["target"])
+            else:
+                _ = await self.control_device(
+                    appliance_id,
+                    command,
+                    optimistic_state=self._optimistic_state(command),
+                )
+
+    @staticmethod
+    def _optimistic_state(command: Command) -> dict[str, Any] | None:
+        """把下行指令映射为乐观状态（用于立即回传 /up）。"""
+        action = command.action
+        if action == "turnOn":
+            return {"turnOnState": "on"}
+        if action == "turnOff":
+            return {"turnOnState": "off"}
+        if action == "setBrightness":
+            params = command.params
+            if params is None:
+                return None
+            return {"turnOnState": "on", "brightness": params["attributeValue"]}
+        if action == "setMode":
+            params = command.params
+            if params is None:
+                return None
+            return {"mode": params["mode"]}
+        if action == "setFanSpeed":
+            params = command.params
+            if params is None:
+                return None
+            return {"fanSpeed": params["speed"]}
+        return None
+
+    async def _adjust_temperature(self, appliance_id: str, target: int) -> None:
+        """用 temperatureUp/Down 循环逼近目标温度（上限 16 步）。"""
+        device = self.data.get(appliance_id)
+        if not device:
+            return
+        current = device.state_setting.get("temperature", {}).get("value")
+        if current is None:
+            return
+        delta = target - int(current)
+        if delta == 0:
+            return
+        action = "temperatureUp" if delta > 0 else "temperatureDown"
+        for _ in range(min(abs(delta), 16)):
+            _ = await self.control_device(appliance_id, Command(action=action))
+
     async def apply_optimistic_state(
         self,
         appliance_id: str,
@@ -194,7 +250,7 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
             device = self.data.get(appliance_id)
             if device:
                 try:
-                    await self.bemfa_sync_manager.update_device_state(
+                    _ = await self.bemfa_sync_manager.update_device_state(
                         appliance_id, device.state_setting
                     )
                 except Exception:
@@ -241,3 +297,9 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
     def devices(self) -> dict[str, Device]:
         """返回当前的设备数据。"""
         return self.data or {}
+
+    async def async_cancel_background_tasks(self) -> None:
+        """取消延迟刷新等后台任务（卸载时调用）。"""
+        for task in self._background_tasks:
+            _ = task.cancel()
+        self._background_tasks.clear()

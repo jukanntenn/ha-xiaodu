@@ -314,6 +314,75 @@ async def test_full_flow_with_bemfa(
     assert result["options"]["bemfa"]["secret_key"] == TEST_BEMFA_SECRET_KEY
 
 
+async def test_full_flow_with_bemfa_v1_uid_only(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """只填 uid 允许提交，secret 留空（v1 模式）。"""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": [TEST_APPLIANCE_ID]}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], _room_mapping_form_data()
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_BEMFA_UID: TEST_BEMFA_UID},
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    bemfa = result["options"]["bemfa"]
+    assert bemfa["enabled"] is True
+    assert bemfa["secret_id"] == ""
+    assert bemfa["secret_key"] == ""
+
+
+async def test_full_flow_bemfa_partial_secret_rejected(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """secret 只填一半时报错。"""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": [TEST_APPLIANCE_ID]}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], _room_mapping_form_data()
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: TEST_BEMFA_UID,
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
+            CONF_BEMFA_SECRET_KEY: "",
+        },
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["errors"]["base"] == "bemfa_secret_required"
+
+
 async def test_unique_id_already_configured(
     hass: HomeAssistant,
     aioclient_mock_fixture: None,
@@ -781,7 +850,7 @@ async def test_bemfa_partial_credentials_rejected(
     hass: HomeAssistant,
     aioclient_mock_fixture: None,
 ) -> None:
-    """UID 填了但 secret 没填 → 报错 bemfa_secret_required。"""
+    """UID 填了但 secret 只填一半 → 报错 bemfa_secret_required。"""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": config_entries.SOURCE_USER}
     )
@@ -804,7 +873,7 @@ async def test_bemfa_partial_credentials_rejected(
         result["flow_id"],
         {
             CONF_BEMFA_UID: TEST_BEMFA_UID,
-            CONF_BEMFA_SECRET_ID: "",
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
             CONF_BEMFA_SECRET_KEY: "",
         },
     )

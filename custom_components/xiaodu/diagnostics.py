@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
@@ -12,6 +12,7 @@ from .const import (
     CONF_COOKIE,
     CONF_ROOM_MAPPING,
 )
+from .coordinator import XiaoduCoordinator
 
 TO_REDACT = {
     CONF_COOKIE,
@@ -27,7 +28,7 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """返回配置条目（config entry）的诊断信息。"""
-    coordinator = entry.runtime_data
+    coordinator = cast(XiaoduCoordinator, entry.runtime_data)
 
     devices_data = {}
     if coordinator.data:
@@ -41,7 +42,7 @@ async def async_get_config_entry_diagnostics(
     bemfa_data = {}
     if coordinator.bemfa_sync_manager:
         mapping = coordinator.bemfa_sync_manager.device_mapping
-        bemfa_data = {
+        bemfa_data: dict[str, object] = {
             k: {
                 "topic": v.bemfa_topic,
                 "nickname": v.bemfa_nickname,
@@ -51,6 +52,11 @@ async def async_get_config_entry_diagnostics(
             }
             for k, v in mapping.items()
         }
+        bemfa_data["mqtt_connected"] = coordinator.bemfa_sync_manager.mqtt_connected
+        bemfa_data["api_version"] = coordinator.bemfa_sync_manager.api_version
+        bemfa_data["unsupported_devices"] = (
+            coordinator.bemfa_sync_manager.unsupported_devices
+        )
 
     return {
         "config_entry_data": async_redact_data(dict(entry.data), TO_REDACT),

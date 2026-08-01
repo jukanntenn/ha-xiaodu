@@ -238,10 +238,10 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
             bemfa_enabled = bool(bemfa_uid)
 
-            # 校验：三字段必须同填或同空（uid 填了，secret 也必须填）
-            if bemfa_enabled and not (secret_id and secret_key):
+            # 校验：uid 必填时 secret 成对可选；只填一半或未填 uid 却填 secret 报错
+            if not bemfa_uid and (secret_id or secret_key):
                 errors["base"] = "bemfa_secret_required"
-            if not bemfa_enabled and (secret_id or secret_key):
+            if bemfa_uid and bool(secret_id) != bool(secret_key):
                 errors["base"] = "bemfa_secret_required"
 
             if not errors:
@@ -400,10 +400,10 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
             secret_key = user_input.get(CONF_BEMFA_SECRET_KEY, "").strip()
             bemfa_enabled = bool(bemfa_uid)
 
-            # 校验：三字段必须同填或同空
-            if bemfa_enabled and not (secret_id and secret_key):
+            # 校验：uid 必填时 secret 成对可选；只填一半或未填 uid 却填 secret 报错
+            if not bemfa_uid and (secret_id or secret_key):
                 errors["base"] = "bemfa_secret_required"
-            if not bemfa_enabled and (secret_id or secret_key):
+            if bemfa_uid and bool(secret_id) != bool(secret_key):
                 errors["base"] = "bemfa_secret_required"
 
             if not errors:

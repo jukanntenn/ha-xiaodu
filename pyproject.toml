@@ -25,6 +25,7 @@ dev = [
     "ty",
     "codespell>=2.4",
     "tomli>=2.0; python_version < '3.11'",
+    "amqtt>=0.11.4,<0.12",
 ]
 
 [tool.ruff]
@@ -99,3 +100,6 @@ addopts = [
     "--tb=short",
     "--strict-markers",
 ]
+
+[tool.uv]
+override-dependencies = ["PyYAML==6.0.3"]

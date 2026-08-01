@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 from aiohttp import ClientError, ClientSession
@@ -11,11 +12,20 @@ from .const import (
     BEMFA_CHANGE_GROUP_URL,
     BEMFA_CHANGE_ROOM_URL,
     BEMFA_CREATE_TOPIC_URL,
-    BEMFA_DEVICE_CONTROL_URL,
-    BEMFA_DEVICE_LIST_URL,
+    BEMFA_CREATE_TOPIC_V1_URL,
+    BEMFA_DELETE_TOPIC_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class CreateTopicResult:
+    """createTopic 结果。"""
+
+    success: bool
+    error_msg: str | None = None
+    code: int | None = None
 
 
 class BemfaAPIClient:
@@ -27,6 +37,12 @@ class BemfaAPIClient:
         session: ClientSession,
         secret_id: str = "",
         secret_key: str = "",
+        *,
+        create_topic_url: str = BEMFA_CREATE_TOPIC_URL,
+        create_topic_v1_url: str = BEMFA_CREATE_TOPIC_V1_URL,
+        delete_topic_url: str = BEMFA_DELETE_TOPIC_URL,
+        change_room_url: str = BEMFA_CHANGE_ROOM_URL,
+        change_group_url: str = BEMFA_CHANGE_GROUP_URL,
     ) -> None:
         """初始化 API 客户端。
 
@@ -35,11 +51,26 @@ class BemfaAPIClient:
             session: aiohttp 客户端会话。
             secret_id: 巴法云 API 密钥对之 secretID（v2 接口创建/删除 topic 必填）。
             secret_key: 巴法云 API 密钥对之 secretKey（v2 接口创建/删除 topic 必填）。
+            create_topic_url: v2 createTopic 端点（默认生产地址，可注入测试）。
+            create_topic_v1_url: v1 createTopic 端点（默认生产地址，可注入测试）。
+            delete_topic_url: deleteTopic 端点（默认生产地址，可注入测试）。
+            change_room_url: 修改房间端点（默认生产地址，可注入测试）。
+            change_group_url: 修改分组端点（默认生产地址，可注入测试）。
         """
         self._bemfa_uid: str = bemfa_uid
         self._session: ClientSession = session
         self._secret_id: str = secret_id
         self._secret_key: str = secret_key
+        self._create_topic_url: str = create_topic_url
+        self._create_topic_v1_url: str = create_topic_v1_url
+        self._delete_topic_url: str = delete_topic_url
+        self._change_room_url: str = change_room_url
+        self._change_group_url: str = change_group_url
+
+    @property
+    def api_version(self) -> str:
+        """当前生效的接口版本。"""
+        return "v2" if self._secret_id and self._secret_key else "v1"
 
     async def _request(
         self,
@@ -47,16 +78,7 @@ class BemfaAPIClient:
         url: str,
         **kwargs: Any,
     ) -> dict[str, Any] | None:
-        """发起 HTTP 请求。
-
-        Args:
-            method: HTTP 方法。
-            url: 请求 URL。
-            **kwargs: 额外参数。
-
-        Returns:
-            响应的 JSON 数据，失败时返回 None。
-        """
+        """发起 HTTP 请求。"""
         try:
             async with self._session.request(method, url, **kwargs) as response:
                 response.raise_for_status()
@@ -72,52 +94,42 @@ class BemfaAPIClient:
             _LOGGER.warning("Bemfa API response error: %s", err)
             return None
 
-    async def create_topic(self, topic: str, name: str) -> tuple[bool, str | None]:
-        """在巴法云上创建一个 topic（主题）。
-
-        Args:
-            topic: topic 名称。
-            name: 设备昵称。
-
-        Returns:
-            (success, error_msg)：成功时 error_msg 为 None；
-            40006（设备已存在）视为成功。
-        """
-        data = await self._request(
-            "post",
-            BEMFA_CREATE_TOPIC_URL,
-            json={
+    async def create_topic(self, topic: str, name: str) -> CreateTopicResult:
+        """创建主题；无 secret 走 v1，有 secret 走 v2。"""
+        if self.api_version == "v2":
+            url = self._create_topic_url
+            payload = {
                 "uid": self._bemfa_uid,
                 "topic": topic,
                 "type": 1,
                 "name": name,
                 "secretID": self._secret_id,
                 "secretKey": self._secret_key,
-            },
-        )
+            }
+        else:
+            url = self._create_topic_v1_url
+            payload = {
+                "uid": self._bemfa_uid,
+                "topic": topic,
+                "type": 1,
+                "name": name,
+            }
+        data = await self._request("post", url, json=payload)
         if not data:
-            return False, "无响应或请求异常"
+            return CreateTopicResult(False, "无响应或请求异常")
         code = data.get("code")
-        # code==0 成功；40006 设备已存在也视为成功
         if code in (0, 40006):
             _LOGGER.debug("Created Bemfa topic: %s (code=%s)", topic, code)
-            return True, None
+            return CreateTopicResult(True, None, code)
         msg = str(data.get("msg") or f"code={code}")
         _LOGGER.warning("Failed to create Bemfa topic %s: %s", topic, msg)
-        return False, msg
+        return CreateTopicResult(False, msg, code)
 
     async def delete_topic(self, topic: str) -> bool:
-        """从巴法云删除一个 topic（主题）。
-
-        Args:
-            topic: topic 名称。
-
-        Returns:
-            成功返回 True。
-        """
+        """从巴法云删除一个 topic（主题）。"""
         data = await self._request(
             "post",
-            "https://pro.bemfa.com/v1/deleteTopic",
+            self._delete_topic_url,
             json={
                 "uid": self._bemfa_uid,
                 "topic": topic,
@@ -133,18 +145,10 @@ class BemfaAPIClient:
         return False
 
     async def change_topic_room(self, topics: list[str], room: str) -> bool:
-        """为 topic 设置所属房间。
-
-        Args:
-            topics: topic 名称列表。
-            room: 房间名称。
-
-        Returns:
-            成功返回 True。
-        """
+        """为 topic 设置所属房间。"""
         data = await self._request(
             "post",
-            BEMFA_CHANGE_ROOM_URL,
+            self._change_room_url,
             json={
                 "openID": self._bemfa_uid,
                 "topicIDs": topics,
@@ -161,18 +165,10 @@ class BemfaAPIClient:
         return False
 
     async def change_topic_group(self, topics: list[str], group: str) -> bool:
-        """为 topic 设置所属分组。
-
-        Args:
-            topics: topic 名称列表。
-            group: 分组名称。
-
-        Returns:
-            成功返回 True。
-        """
+        """为 topic 设置所属分组。"""
         data = await self._request(
             "post",
-            BEMFA_CHANGE_GROUP_URL,
+            self._change_group_url,
             json={
                 "openID": self._bemfa_uid,
                 "topicIDs": topics,
@@ -187,54 +183,3 @@ class BemfaAPIClient:
             return True
         _LOGGER.warning("Failed to change group: %s", data.get("msg"))
         return False
-
-    async def control_device(self, topic: str, message: dict, device_type: int) -> bool:
-        """向设备发送控制指令。
-
-        Args:
-            topic: 设备 topic。
-            message: 控制消息。
-            device_type: 设备类型代码。
-
-        Returns:
-            成功返回 True。
-        """
-        data = await self._request(
-            "post",
-            BEMFA_DEVICE_CONTROL_URL,
-            json={
-                "uid": self._bemfa_uid,
-                "topic": topic,
-                "type": device_type,
-                "message": message,
-            },
-        )
-        if not data:
-            return False
-        if data.get("code") == 0:
-            _LOGGER.debug("Controlled Bemfa device %s: %s", topic, message)
-            return True
-        _LOGGER.warning("Failed to control Bemfa device %s: %s", topic, data.get("msg"))
-        return False
-
-    async def get_device_list(self) -> list[dict[str, Any]]:
-        """从巴法云获取设备列表。
-
-        Returns:
-            设备字典列表。
-        """
-        data = await self._request(
-            "get",
-            BEMFA_DEVICE_LIST_URL,
-            params={"openID": self._bemfa_uid},
-        )
-        if not data:
-            return []
-        if data.get("code") != 0:
-            _LOGGER.warning("Failed to get Bemfa devices: %s", data.get("msg"))
-            return []
-        payload = data.get("data", {})
-        if not isinstance(payload, dict):
-            return []
-        devices = payload.get("array", [])
-        return [d for d in devices if isinstance(d, dict)]
