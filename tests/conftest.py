@@ -7,8 +7,10 @@ execution. No patching of API classes.
 from __future__ import annotations
 
 import json
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -18,6 +20,14 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
+from custom_components.xiaodu.bemfa.const import (
+    BEMFA_CHANGE_GROUP_URL,
+    BEMFA_CHANGE_ROOM_URL,
+    BEMFA_CREATE_TOPIC_URL,
+    BEMFA_DEVICE_CONTROL_URL,
+    BEMFA_DEVICE_LIST_URL,
+)
+from custom_components.xiaodu.bemfa.mqtt_client import BemfaMQTTClient
 from custom_components.xiaodu.const import (
     CONF_COOKIE,
     CONF_HOUSE_ID,
@@ -43,10 +53,54 @@ def load_json_fixture(filename: str, subdir: str = "xiaodu") -> dict[str, Any]:
     return json.loads((FIXTURES_DIR / subdir / filename).read_text(encoding="utf-8"))
 
 
+def register_bemfa_endpoints(aioclient_mock: AiohttpClientMocker) -> None:
+    """Register all Bemfa HTTP API endpoints with fixture data."""
+    aioclient_mock.post(
+        BEMFA_CREATE_TOPIC_URL,
+        json=load_json_fixture("create_topic_ok.json", "bemfa"),
+    )
+    aioclient_mock.post(
+        "https://pro.bemfa.com/v1/deleteTopic",
+        json=load_json_fixture("delete_topic_ok.json", "bemfa"),
+    )
+    aioclient_mock.post(
+        BEMFA_CHANGE_ROOM_URL,
+        json=load_json_fixture("change_topic_room_ok.json", "bemfa"),
+    )
+    aioclient_mock.post(
+        BEMFA_CHANGE_GROUP_URL,
+        json=load_json_fixture("change_topic_group_ok.json", "bemfa"),
+    )
+    aioclient_mock.post(
+        BEMFA_DEVICE_CONTROL_URL,
+        json=load_json_fixture("control_device_ok.json", "bemfa"),
+    )
+    aioclient_mock.get(
+        BEMFA_DEVICE_LIST_URL,
+        json=load_json_fixture("device_list_ok.json", "bemfa"),
+    )
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Enable custom integrations."""
     return
+
+
+@pytest.fixture(autouse=True)
+def mock_bemfa_mqtt_connect() -> Generator[None]:
+    """Keep Bemfa MQTT hermetic: never start a real paho network thread.
+
+    MQTT is an external service, so the Bemfa MQTT client is patched (as
+    AGENTS.md permits), while Bemfa HTTP endpoints go through aioclient_mock.
+    Pretend the broker session is established so publish paths stay testable.
+    """
+
+    def _fake_connect(self: BemfaMQTTClient) -> None:
+        self._connected = True
+
+    with patch.object(BemfaMQTTClient, "connect", _fake_connect):
+        yield
 
 
 @pytest.fixture
@@ -134,3 +188,6 @@ def aioclient_mock_fixture(aioclient_mock: AiohttpClientMocker) -> None:
         f"{HOST}/saiya/smarthome/directivesend",
         side_effect=_control_side_effect,
     )
+    # Bemfa HTTP endpoints (unused mocks are harmless for tests without Bemfa;
+    # tests that enable Bemfa need these during setup, sync, and unload).
+    register_bemfa_endpoints(aioclient_mock)

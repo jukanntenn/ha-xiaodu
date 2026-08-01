@@ -15,14 +15,7 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 )
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
-from custom_components.xiaodu.bemfa.const import (
-    BEMFA_CHANGE_GROUP_URL,
-    BEMFA_CHANGE_ROOM_URL,
-    BEMFA_CREATE_TOPIC_URL,
-    BEMFA_DEVICE_CONTROL_URL,
-    BEMFA_DEVICE_LIST_URL,
-)
-from tests.conftest import load_json_fixture
+from tests.conftest import load_json_fixture, register_bemfa_endpoints
 
 
 class DeviceListSideEffect:
@@ -48,34 +41,6 @@ class DeviceListSideEffect:
             status=200,
             json=load_json_fixture(fixture),
         )
-
-
-def register_bemfa_endpoints(aioclient_mock: AiohttpClientMocker) -> None:
-    """Register all Bemfa HTTP API endpoints with fixture data."""
-    aioclient_mock.post(
-        BEMFA_CREATE_TOPIC_URL,
-        json=load_json_fixture("create_topic_ok.json", "bemfa"),
-    )
-    aioclient_mock.post(
-        "https://pro.bemfa.com/v1/deleteTopic",
-        json=load_json_fixture("delete_topic_ok.json", "bemfa"),
-    )
-    aioclient_mock.post(
-        BEMFA_CHANGE_ROOM_URL,
-        json=load_json_fixture("change_topic_room_ok.json", "bemfa"),
-    )
-    aioclient_mock.post(
-        BEMFA_CHANGE_GROUP_URL,
-        json=load_json_fixture("change_topic_group_ok.json", "bemfa"),
-    )
-    aioclient_mock.post(
-        BEMFA_DEVICE_CONTROL_URL,
-        json=load_json_fixture("control_device_ok.json", "bemfa"),
-    )
-    aioclient_mock.get(
-        BEMFA_DEVICE_LIST_URL,
-        json=load_json_fixture("device_list_ok.json", "bemfa"),
-    )
 
 
 @pytest.fixture
