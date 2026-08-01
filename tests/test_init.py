@@ -5,6 +5,7 @@ Uses aioclient_mock to drive real XiaoduAPI execution (flo paradigm).
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import patch
 
 from homeassistant.config_entries import ConfigEntryState
@@ -110,9 +111,56 @@ async def test_unload_with_bemfa_cleans_up_topics(
 
     assert mock_config_entry_with_bemfa.state is ConfigEntryState.NOT_LOADED
 
-    # Each mapped device should have triggered exactly one delete_topic call.
+    # Every mapped device should have triggered a delete_topic call. The two
+    # seeded devices must be among them (setup may also have synced the
+    # fixture devices, so the total count can be larger than two).
     # mock_calls tuple is (method, url, data, headers); url is a yarl.URL.
     delete_calls = [c for c in aioclient_mock.mock_calls if "deleteTopic" in str(c[1])]
-    assert len(delete_calls) == 2
+    assert len(delete_calls) >= 2
+    deleted_topics = {c[2]["topic"] for c in delete_calls if c[2] is not None}
+    assert {"topic_a", "topic_b"} <= deleted_topics
     # The mapping should be empty after cleanup.
     assert coordinator.bemfa_sync_manager.device_mapping == {}
+
+
+async def test_unload_with_bemfa_disconnects_when_topic_cleanup_fails(
+    hass: HomeAssistant,
+    mock_config_entry_with_bemfa: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+    aioclient_mock_fixture: None,
+) -> None:
+    """Test unload still disconnects MQTT when topic cleanup fails.
+
+    Guards async_cleanup_all: a topic-deletion error must not skip the MQTT
+    disconnect (which previously left the paho network thread running).
+    """
+    mock_config_entry_with_bemfa.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry_with_bemfa.entry_id)
+    await hass.async_block_till_done()
+
+    coordinator = mock_config_entry_with_bemfa.runtime_data
+    coordinator.bemfa_sync_manager._device_mapping["dev_err"] = DeviceMapping(
+        xiaodu_appliance_id="dev_err",
+        bemfa_topic="topic_err",
+        device_type="LIGHT",
+    )
+
+    # Replace mocks so deleteTopic raises during unload cleanup.
+    aioclient_mock.clear_requests()
+
+    async def _topic_cleanup_failure(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> None:
+        raise RuntimeError("topic cleanup failed")
+
+    aioclient_mock.post(DELETE_TOPIC_URL, side_effect=_topic_cleanup_failure)
+
+    with patch.object(
+        coordinator.bemfa_sync_manager._mqtt_client, "disconnect"
+    ) as mock_disconnect:
+        assert await hass.config_entries.async_unload(
+            mock_config_entry_with_bemfa.entry_id
+        )
+        await hass.async_block_till_done()
+
+    mock_disconnect.assert_called_once()

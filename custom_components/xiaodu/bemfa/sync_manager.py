@@ -74,10 +74,16 @@ class BemfaDeviceSyncManager:
         """删除所有巴法云 topic 并断开连接。
 
         在集成卸载（unload）时调用，避免巴法云上出现孤立的 topic。
-        topic 删除通过 HTTP API（aiohttp）完成，之后再断开 MQTT。
+        topic 删除通过 HTTP API（aiohttp）完成，之后再断开 MQTT；
+        单个 topic 删除失败仅记录日志，不会阻塞其余清理或 MQTT 断开。
         """
         for appliance_id in list(self._device_mapping.keys()):
-            await self.remove_device(appliance_id)
+            try:
+                await self.remove_device(appliance_id)
+            except Exception:
+                _LOGGER.warning(
+                    "Failed to remove Bemfa topic for %s", appliance_id, exc_info=True
+                )
         await self.async_disconnect()
 
     def get_topic(self, appliance_id: str) -> str | None:
