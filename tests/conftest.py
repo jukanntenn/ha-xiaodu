@@ -203,9 +203,7 @@ class MqttBrokerHandle:
 class MqttProbe:
     """扮演巴法云侧的 paho 客户端：订阅 # 观察上行，向 {topic} 发下行。"""
 
-    def __init__(
-        self, client: mqtt.Client, received: list[tuple[str, str]]
-    ) -> None:
+    def __init__(self, client: mqtt.Client, received: list[tuple[str, str]]) -> None:
         self._client = client
         self._received = received
 
@@ -277,9 +275,7 @@ async def bemfa_mqtt_probe(
             connected.set()
 
     def _on_message(c, u, msg) -> None:
-        received.append(
-            (msg.topic, msg.payload.decode("utf-8", errors="replace"))
-        )
+        received.append((msg.topic, msg.payload.decode("utf-8", errors="replace")))
 
     client.on_connect = _on_connect
     client.on_message = _on_message
@@ -288,8 +284,12 @@ async def bemfa_mqtt_probe(
     await asyncio.to_thread(connected.wait, 5)
     probe = MqttProbe(client, received)
     yield probe
-    client.loop_stop()
-    client.disconnect()
+    # paho 的 disconnect()/loop_stop() 是同步阻塞调用。直接在 event loop 线程
+    # 执行会卡住 loop 调度，导致 amqtt broker 无法推进与 probe 的 DISCONNECT
+    # 握手（broker 端在 await handler.stop()），形成死锁式等待直至超时。
+    # 用 to_thread 把阻塞调用移到工作线程，保持 event loop 畅通。
+    await asyncio.to_thread(client.disconnect)
+    await asyncio.to_thread(client.loop_stop)
 
 
 @pytest.fixture

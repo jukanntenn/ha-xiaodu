@@ -79,8 +79,11 @@ class BemfaMQTTClient:
         if self._client is None:
             return
         _LOGGER.debug("Disconnecting from Bemfa MQTT broker")
-        _ = self._client.loop_stop()
+        # 先 disconnect() 触发 socket 关闭，paho 网络循环的 select 会立即返回，
+        # 随后 loop_stop() 才能干净地 join 线程。顺序颠倒会让 loop_stop() 阻塞
+        # 在线程 join 上等待一个永远不会自行结束的 select 循环（直至超时）。
         _ = self._client.disconnect()
+        _ = self._client.loop_stop()
         self._client = None
         self._connected = False
         self._connect_event.clear()
