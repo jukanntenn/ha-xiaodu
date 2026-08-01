@@ -14,10 +14,13 @@ from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
+from custom_components.xiaodu.bemfa.const import BEMFA_TOPIC_PREFIX
 from custom_components.xiaodu.bemfa.sync_manager import DeviceMapping
 from tests.conftest import MqttBrokerHandle
 
 DELETE_TOPIC_URL = "https://pro.bemfa.com/v1/deleteTopic"
+
+TOPIC_PREFIX = BEMFA_TOPIC_PREFIX
 
 
 def _wait_for_sessions(
@@ -103,12 +106,12 @@ async def test_unload_with_bemfa_cleans_up_topics(
     # triggers a delete_topic call on unload.
     coordinator.bemfa_sync_manager._device_mapping["dev_a"] = DeviceMapping(
         xiaodu_appliance_id="dev_a",
-        bemfa_topic="topic_a",
+        bemfa_topic=f"{TOPIC_PREFIX}aaaa00000000002",
         device_type="LIGHT",
     )
     coordinator.bemfa_sync_manager._device_mapping["dev_b"] = DeviceMapping(
         xiaodu_appliance_id="dev_b",
-        bemfa_topic="topic_b",
+        bemfa_topic=f"{TOPIC_PREFIX}bbbb00000000006",
         device_type="SWITCH",
     )
 
@@ -128,7 +131,9 @@ async def test_unload_with_bemfa_cleans_up_topics(
     delete_calls = [c for c in aioclient_mock.mock_calls if "deleteTopic" in str(c[1])]
     assert len(delete_calls) >= 2
     deleted_topics = {c[2]["topic"] for c in delete_calls if c[2] is not None}
-    assert {"topic_a", "topic_b"} <= deleted_topics
+    assert {f"{TOPIC_PREFIX}aaaa00000000002", f"{TOPIC_PREFIX}bbbb00000000006"} <= (
+        deleted_topics
+    )
     # The mapping should be empty after cleanup.
     assert coordinator.bemfa_sync_manager.device_mapping == {}
     # 真实断开：broker 上只剩探针会话（本测试未启用探针，因此为 0）。

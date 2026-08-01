@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
@@ -11,14 +12,20 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 from custom_components.xiaodu.api.xiaodu_types import Device
 from custom_components.xiaodu.bemfa.api_client import BemfaAPIClient
 from custom_components.xiaodu.bemfa.const import (
+    BEMFA_ALL_TOPIC_URL,
     BEMFA_CHANGE_GROUP_URL,
     BEMFA_CHANGE_ROOM_URL,
     BEMFA_CREATE_TOPIC_URL,
     BEMFA_CREATE_TOPIC_V1_URL,
     BEMFA_DELETE_TOPIC_URL,
+    BEMFA_MODIFY_NAME_URL,
+    BEMFA_TOPIC_PREFIX,
 )
 from custom_components.xiaodu.bemfa.mqtt_client import BemfaMQTTClient
-from custom_components.xiaodu.bemfa.sync_manager import BemfaDeviceSyncManager
+from custom_components.xiaodu.bemfa.sync_manager import (
+    BemfaDeviceSyncManager,
+    DeviceMapping,
+)
 from tests.conftest import MqttBrokerHandle, MqttProbe
 from tests.const import (
     TEST_BEMFA_SECRET_ID,
@@ -34,6 +41,13 @@ def _device(appliance_id: str = "appliance_test_light_001") -> Device:
         room_name="次卧",
         appliance_types=["LIGHT"],
     )
+
+
+@pytest.fixture(autouse=True)
+def _bemfa_default_mocks(aioclient_mock: AiohttpClientMocker) -> None:
+    """默认注册 allTopic（孤儿检测）与 modifyName（昵称跟随）端点。"""
+    aioclient_mock.get(BEMFA_ALL_TOPIC_URL, json={"code": 0, "data": []})
+    aioclient_mock.post(BEMFA_MODIFY_NAME_URL, json={"code": 0})
 
 
 def _manager(
@@ -291,3 +305,152 @@ async def test_unsupported_devices_tracked(
         {},
     )
     assert manager.unsupported_devices == {"dev_lock": ["DOOR_LOCK"]}
+
+
+# ---------------------------------------------------------------------------
+# topic 命名空间（前缀 + 稳定哈希）
+# ---------------------------------------------------------------------------
+
+
+def test_generate_topic_uses_prefix_and_hash() -> None:
+    """topic = xdu + md5(appliance_id)[:12] + 3 位类型后缀。"""
+    topic = BemfaDeviceSyncManager._generate_topic("appliance_test_light_001", "LIGHT")
+    assert topic.startswith(BEMFA_TOPIC_PREFIX)
+    assert topic.endswith("002")
+    assert len(topic) == len(BEMFA_TOPIC_PREFIX) + 12 + 3
+    # 确定性：相同输入产生相同 topic
+    assert (
+        BemfaDeviceSyncManager._generate_topic("appliance_test_light_001", "LIGHT")
+        == topic
+    )
+
+
+def test_generate_topic_ignores_rename() -> None:
+    """topic 与名字无关——改名/改昵称不影响稳定关联。"""
+    a = BemfaDeviceSyncManager._generate_topic("dev_a", "LIGHT")
+    b = BemfaDeviceSyncManager._generate_topic("dev_b", "LIGHT")
+    assert a != b
+    assert BemfaDeviceSyncManager._generate_topic("dev_a", "LIGHT") == a
+
+
+def test_is_integration_topic() -> None:
+    """前缀校验：只认本集成 topic。"""
+    assert BemfaDeviceSyncManager.is_integration_topic(
+        f"{BEMFA_TOPIC_PREFIX}4f8e2c1a9b7d002"
+    )
+    assert not BemfaDeviceSyncManager.is_integration_topic("haha001")
+    assert not BemfaDeviceSyncManager.is_integration_topic("ha4f8e2c1a9b7d002")
+
+
+async def test_remove_device_refuses_non_integration_topic(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """防御性校验：非集成前缀的 topic 拒绝删除（绝不误删用户设备）。"""
+    manager = _manager(hass)
+    manager._device_mapping["dev_user"] = DeviceMapping(
+        xiaodu_appliance_id="dev_user",
+        bemfa_topic="haha001",
+        device_type="LIGHT",
+    )
+    aioclient_mock.post(BEMFA_DELETE_TOPIC_URL, json={"code": 0})
+    await manager.remove_device("dev_user")
+    assert not any("deleteTopic" in str(c[1]) for c in aioclient_mock.mock_calls)
+    # 映射仍被移除（本地状态清理不受影响）
+    assert "dev_user" not in manager.device_mapping
+
+
+async def test_cleanup_orphans_deletes_only_integration_topics(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """孤儿检测：删除带前缀但不在映射中的 topic，用户自建 topic 保留。"""
+    orphan = f"{BEMFA_TOPIC_PREFIX}deadbeef1234002"
+    user_topic = "haha001"
+    aioclient_mock.clear_requests()
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    aioclient_mock.get(
+        BEMFA_ALL_TOPIC_URL,
+        json={
+            "code": 0,
+            "data": [{"topic": orphan}, {"topic": user_topic}],
+        },
+    )
+    aioclient_mock.post(BEMFA_DELETE_TOPIC_URL, json={"code": 0})
+    manager = _manager(hass)
+    await manager.sync_devices([_device()], {})
+    deleted = [c for c in aioclient_mock.mock_calls if "deleteTopic" in str(c[1])]
+    assert len(deleted) == 1
+    assert deleted[0][2]["topic"] == orphan
+
+
+# ---------------------------------------------------------------------------
+# 昵称标准化（房间 token 剥离 + modifyName 跟随）
+# ---------------------------------------------------------------------------
+
+
+def test_generate_nickname_strips_room_prefix() -> None:
+    """设备名含房间前缀时剥离，避免矛盾命名（书房儿童房主灯）。"""
+    device = Device(
+        appliance_id="dev_1",
+        friendly_name="儿童房主灯",
+        room_name="儿童房",
+        appliance_types=["LIGHT"],
+    )
+    nickname = BemfaDeviceSyncManager._generate_nickname(device, {"儿童房": "书房"})
+    assert nickname == "书房主灯"
+
+
+def test_generate_nickname_keeps_roomless_name() -> None:
+    """设备名不含房间 token 时原样拼接（电视墙射灯）。"""
+    device = Device(
+        appliance_id="dev_2",
+        friendly_name="电视墙射灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    assert (
+        BemfaDeviceSyncManager._generate_nickname(device, {"客厅": "客厅"})
+        == "客厅电视墙射灯"
+    )
+
+
+async def test_nickname_follows_mapping_change(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """映射变更后，期望昵称变化 → modifyName 更新并记录新昵称。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_1",
+        friendly_name="儿童房主灯",
+        room_name="儿童房",
+        appliance_types=["LIGHT"],
+    )
+    await manager.sync_devices([device], {"儿童房": "书房"})
+    mapping = manager.device_mapping["dev_1"]
+    assert mapping.bemfa_nickname == "书房主灯"
+    aioclient_mock.mock_calls.clear()
+
+    # 修改映射 → 昵称应更新
+    await manager.sync_devices([device], {"儿童房": "多功能室"})
+    calls = [c for c in aioclient_mock.mock_calls if "modifyName" in str(c[1])]
+    assert len(calls) == 1
+    assert calls[0][2]["name"] == "多功能室主灯"
+    assert manager.device_mapping["dev_1"].bemfa_nickname == "多功能室主灯"
+
+
+async def test_nickname_unchanged_skips_modify_name(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """昵称未变化时不发 modifyName（幂等）。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    manager = _manager(hass)
+    await manager.sync_devices([_device()], {"次卧": "次卧"})
+    aioclient_mock.mock_calls.clear()
+    await manager.sync_devices([_device()], {"次卧": "次卧"})
+    assert not any("modifyName" in str(c[1]) for c in aioclient_mock.mock_calls)

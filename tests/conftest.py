@@ -24,9 +24,11 @@ from pytest_homeassistant_custom_component.test_util.aiohttp import (
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.bemfa.const import (
+    BEMFA_ALL_TOPIC_URL,
     BEMFA_CHANGE_GROUP_URL,
     BEMFA_CHANGE_ROOM_URL,
     BEMFA_CREATE_TOPIC_URL,
+    BEMFA_MODIFY_NAME_URL,
 )
 from custom_components.xiaodu.const import (
     CONF_COOKIE,
@@ -70,6 +72,14 @@ def register_bemfa_endpoints(aioclient_mock: AiohttpClientMocker) -> None:
     aioclient_mock.post(
         BEMFA_CHANGE_GROUP_URL,
         json=load_json_fixture("change_topic_group_ok.json", "bemfa"),
+    )
+    aioclient_mock.get(
+        BEMFA_ALL_TOPIC_URL,
+        json=load_json_fixture("all_topic_empty.json", "bemfa"),
+    )
+    aioclient_mock.post(
+        BEMFA_MODIFY_NAME_URL,
+        json=load_json_fixture("modify_name_ok.json", "bemfa"),
     )
 
 

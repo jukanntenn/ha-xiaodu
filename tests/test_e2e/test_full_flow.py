@@ -66,12 +66,18 @@ async def _run_config_flow_to_bemfa(
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], ROOM_MAPPING
     )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"next_step_id": "bemfa_skip" if not bemfa_uid else "bemfa_v2"},
+    )
+    if not bemfa_uid:
+        return result
     return await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
             CONF_BEMFA_UID: bemfa_uid,
-            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID if bemfa_uid else "",
-            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY if bemfa_uid else "",
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
+            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY,
         },
     )
 
