@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from homeassistant.core import callback
+from typing import override
+
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import area_registry as ar
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
 from .coordinator import XiaoduCoordinator
+from .naming import strip_room
 
 
 class XiaoduEntity(CoordinatorEntity[XiaoduCoordinator]):
@@ -31,6 +36,29 @@ class XiaoduEntity(CoordinatorEntity[XiaoduCoordinator]):
         self._appliance_id = appliance_id
         self._attr_unique_id = f"{DOMAIN}_{appliance_id}"
 
+    @override
+    async def async_added_to_hass(self) -> None:
+        """注册设备到 HA 后，主动管理设备区域（只填空不覆盖）。"""
+        await super().async_added_to_hass()
+        device = self.coordinator.data.get(self._appliance_id)
+        if not device or not device.room_name:
+            return
+        expected_area = self.coordinator.room_mapping.get(
+            device.room_name, device.room_name
+        )
+        if not expected_area:
+            return
+        hass: HomeAssistant = self.hass
+        registry = dr.async_get(hass)
+        device_entry = registry.async_get_device(
+            identifiers={(DOMAIN, self._appliance_id)}
+        )
+        if device_entry is None or device_entry.area_id:
+            # 已存在或用户已手动分配区域——不覆盖
+            return
+        area = ar.async_get(hass).async_get_or_create(expected_area)
+        _updated_entry = registry.async_update_device(device_entry.id, area_id=area.id)
+
     @property
     def device_info(self) -> DeviceInfo:
         """返回设备信息。"""
@@ -41,7 +69,7 @@ class XiaoduEntity(CoordinatorEntity[XiaoduCoordinator]):
             )
             return DeviceInfo(
                 identifiers={(DOMAIN, self._appliance_id)},
-                name=device.friendly_name,
+                name=strip_room(device.friendly_name, device.room_name, mapped_room),
                 manufacturer="Xiaodu",
                 model=device.appliance_types[0] if device.appliance_types else None,
                 suggested_area=mapped_room or None,
