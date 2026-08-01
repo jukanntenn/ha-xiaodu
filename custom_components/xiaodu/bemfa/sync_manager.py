@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
 
 from ..api.xiaodu_types import Device
 from ..const import DEVICE_TYPE_SUFFIX_MAP
+from ..naming import strip_room
 from .api_client import BemfaAPIClient
-from .const import BEMFA_RETRY_INTERVAL_SECONDS
+from .const import (
+    BEMFA_RETRY_INTERVAL_SECONDS,
+    BEMFA_TOPIC_HASH_LENGTH,
+    BEMFA_TOPIC_PREFIX,
+)
 from .mqtt_client import BemfaMQTTClient
 from .protocol import encode_state
 
@@ -145,6 +151,10 @@ class BemfaDeviceSyncManager:
         }
         mapped_ids = set(self._device_mapping.keys())
 
+        # 首次同步时检测并清理巴法云上的孤儿 topic（前缀匹配但不在当前映射中）
+        if not mapped_ids:
+            await self._cleanup_orphans()
+
         # 新增的设备 + 退避到期的失败设备
         new_ids = current_ids - mapped_ids
         retry_ids = set(new_ids)
@@ -163,6 +173,62 @@ class BemfaDeviceSyncManager:
         removed_ids = mapped_ids - current_ids
         for appliance_id in removed_ids:
             await self.remove_device(appliance_id)
+
+        # 昵称跟随：期望昵称与实际不一致时更新（映射变更 / 百度改名）
+        await self._sync_nicknames(devices, room_mapping)
+
+    async def _cleanup_orphans(self) -> None:
+        """删除巴法云上带集成前缀但不在当前映射中的孤儿 topic。
+
+        仅在首次同步（无映射）时调用，尽力而为：任何失败仅记录日志，
+        绝不阻塞设备创建主流程。
+        """
+        try:
+            topics = await self._api_client.list_topics()
+        except Exception:
+            _LOGGER.warning("Bemfa orphan scan failed", exc_info=True)
+            return
+        if topics is None:
+            return
+        managed = {
+            mapping.bemfa_topic
+            for mapping in self._device_mapping.values()
+            if mapping.bemfa_topic
+        }
+        for topic in topics:
+            if self.is_integration_topic(topic) and topic not in managed:
+                _LOGGER.warning("Deleting orphan Bemfa topic: %s", topic)
+                try:
+                    _ = await self._api_client.delete_topic(topic)
+                except Exception:
+                    _LOGGER.warning(
+                        "Failed to delete orphan topic %s", topic, exc_info=True
+                    )
+
+    async def _sync_nicknames(
+        self,
+        devices: list[Device],
+        room_mapping: dict[str, str],
+    ) -> None:
+        """同步期望昵称到巴法云（modifyName），仅在昵称变化时调用。"""
+        for device in devices:
+            mapping = self._device_mapping.get(device.appliance_id)
+            if not mapping or not mapping.bemfa_topic:
+                continue
+            expected = self._generate_nickname(device, room_mapping)
+            if mapping.bemfa_nickname == expected:
+                continue
+            try:
+                ok = await self._api_client.modify_name(mapping.bemfa_topic, expected)
+            except Exception:
+                _LOGGER.warning(
+                    "Failed to update nickname for %s",
+                    device.appliance_id,
+                    exc_info=True,
+                )
+                continue
+            if ok:
+                mapping.bemfa_nickname = expected
 
     async def _add_device(self, device: Device, room_mapping: dict[str, str]) -> None:
         """向巴法云添加一个新设备。
@@ -215,6 +281,8 @@ class BemfaDeviceSyncManager:
     async def remove_device(self, appliance_id: str) -> None:
         """从巴法云移除一个设备。
 
+        防御性校验：仅删除带集成前缀的 topic，绝不触碰用户自建设备。
+
         Args:
             appliance_id: 小度 appliance ID。
         """
@@ -222,8 +290,14 @@ class BemfaDeviceSyncManager:
         if not mapping:
             return
         if mapping.bemfa_topic:
-            await self._api_client.delete_topic(mapping.bemfa_topic)
-            self._mqtt_client.unsubscribe(mapping.bemfa_topic)
+            if not self.is_integration_topic(mapping.bemfa_topic):
+                _LOGGER.warning(
+                    "Refusing to delete non-integration topic %s",
+                    mapping.bemfa_topic,
+                )
+            else:
+                _ = await self._api_client.delete_topic(mapping.bemfa_topic)
+                self._mqtt_client.unsubscribe(mapping.bemfa_topic)
         del self._device_mapping[appliance_id]
         _LOGGER.info("Removed Bemfa device: %s", appliance_id)
 
@@ -255,11 +329,12 @@ class BemfaDeviceSyncManager:
     def _generate_topic(appliance_id: str, device_type: str) -> str:
         """根据 appliance ID 生成巴法云 topic。
 
-        Rules:
-            1. 去除 appliance_id 的前导零
-            2. 将下划线 _ 替换为 U
-            3. 追加索引 0
-            4. 追加 3 位设备类型代码
+        格式：{前缀}{md5(appliance_id) 前 12 位}{3 位设备类型代码}。
+
+        规则：
+            1. 前缀标识集成归属（删除/操作前据此过滤）
+            2. 哈希由 appliance_id 确定性生成——改名/改昵称不影响关联
+            3. 后缀用于巴法云设备类型识别（末尾 3 位）
 
         Args:
             appliance_id: 小度 appliance ID。
@@ -268,19 +343,23 @@ class BemfaDeviceSyncManager:
         Returns:
             巴法云 topic 字符串。
         """
-        # 去除前导零
-        cleaned = appliance_id.lstrip("0") or "0"
-        # 将下划线替换为 U
-        cleaned = cleaned.replace("_", "U")
-        # 获取类型后缀
+        # S324: md5 仅作确定性混淆（非安全用途），社区同款
+        digest = hashlib.md5(  # noqa: S324
+            appliance_id.encode("utf-8")
+        ).hexdigest()[:BEMFA_TOPIC_HASH_LENGTH]
         suffix = DEVICE_TYPE_SUFFIX_MAP.get(device_type, "006")
-        return f"{cleaned}0{suffix}"
+        return f"{BEMFA_TOPIC_PREFIX}{digest}{suffix}"
+
+    @staticmethod
+    def is_integration_topic(topic: str) -> bool:
+        """判断 topic 是否为本集成创建的（带集成前缀）。"""
+        return topic.startswith(BEMFA_TOPIC_PREFIX)
 
     @staticmethod
     def _generate_nickname(device: Device, room_mapping: dict[str, str]) -> str:
         """为设备生成巴法云昵称。
 
-        格式：映射后的房间名 + 设备友好名称。
+        格式：映射后的房间名 + 剥离房间 token 后的设备名。
 
         Args:
             device: 小度设备。
@@ -290,7 +369,8 @@ class BemfaDeviceSyncManager:
             昵称字符串。
         """
         mapped_room = room_mapping.get(device.room_name, device.room_name)
-        return f"{mapped_room}{device.friendly_name}"
+        stripped = strip_room(device.friendly_name, device.room_name, mapped_room)
+        return f"{mapped_room}{stripped}"
 
     @staticmethod
     def _get_primary_type(appliance_types: list[str]) -> str | None:

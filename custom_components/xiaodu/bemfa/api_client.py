@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 from aiohttp import ClientError, ClientSession
 
 from .const import (
+    BEMFA_ALL_TOPIC_URL,
     BEMFA_CHANGE_GROUP_URL,
     BEMFA_CHANGE_ROOM_URL,
     BEMFA_CREATE_TOPIC_URL,
     BEMFA_CREATE_TOPIC_V1_URL,
     BEMFA_DELETE_TOPIC_URL,
+    BEMFA_MODIFY_NAME_URL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,6 +45,8 @@ class BemfaAPIClient:
         delete_topic_url: str = BEMFA_DELETE_TOPIC_URL,
         change_room_url: str = BEMFA_CHANGE_ROOM_URL,
         change_group_url: str = BEMFA_CHANGE_GROUP_URL,
+        modify_name_url: str = BEMFA_MODIFY_NAME_URL,
+        all_topic_url: str = BEMFA_ALL_TOPIC_URL,
     ) -> None:
         """初始化 API 客户端。
 
@@ -66,6 +70,8 @@ class BemfaAPIClient:
         self._delete_topic_url: str = delete_topic_url
         self._change_room_url: str = change_room_url
         self._change_group_url: str = change_group_url
+        self._modify_name_url: str = modify_name_url
+        self._all_topic_url: str = all_topic_url
 
     @property
     def api_version(self) -> str:
@@ -183,3 +189,45 @@ class BemfaAPIClient:
             return True
         _LOGGER.warning("Failed to change group: %s", data.get("msg"))
         return False
+
+    async def modify_name(self, topic: str, name: str) -> bool:
+        """修改主题昵称。"""
+        data = await self._request(
+            "post",
+            self._modify_name_url,
+            json={
+                "uid": self._bemfa_uid,
+                "topic": topic,
+                "type": 1,
+                "name": name,
+            },
+        )
+        if not data:
+            return False
+        if data.get("code") == 0:
+            _LOGGER.debug("Modified name for topic %s to %s", topic, name)
+            return True
+        _LOGGER.warning("Failed to modify name: %s", data.get("msg"))
+        return False
+
+    async def list_topics(self) -> list[str] | None:
+        """列出账号下全部 MQTT topic；请求失败返回 None。"""
+        data = await self._request(
+            "get",
+            f"{self._all_topic_url}?openID={self._bemfa_uid}&type=1",
+        )
+        if not data:
+            return None
+        if data.get("code") != 0:
+            _LOGGER.warning("Failed to list topics: %s", data.get("msg"))
+            return None
+        topics_data = data.get("data")
+        if not isinstance(topics_data, list):
+            _LOGGER.warning("Unexpected allTopic response shape")
+            return None
+        topics: list[str] = []
+        for item in cast(list[dict[str, object]], topics_data):
+            raw_topic = item.get("topic")
+            if isinstance(raw_topic, str):
+                topics.append(raw_topic)
+        return topics
