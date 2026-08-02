@@ -304,6 +304,15 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
         return self.config_entry.options.get(CONF_ROOM_MAPPING, {})
 
     @property
+    def room_tokens(self) -> set[str]:
+        """返回小度侧的全部房间名集合。
+
+        实时取自当前设备数据，作为设备名房间 token 剥离的锚点全集，
+        可跟随用户在小度 App 里的房间增删/改名。首次刷新前为空集。
+        """
+        return {d.room_name for d in (self.data or {}).values() if d.room_name}
+
+    @property
     def devices(self) -> dict[str, Device]:
         """返回当前的设备数据。"""
         return self.data or {}

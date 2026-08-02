@@ -60,7 +60,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     bemfa_sync_manager: BemfaDeviceSyncManager | None = None
     bemfa_config: dict[str, Any] = entry.options.get("bemfa", {})
     if bemfa_config.get("enabled"):
-        bemfa_uid = bemfa_config.get("uid", "")
+        bemfa_uid: str = cast("str", bemfa_config.get("uid", ""))
         if bemfa_uid:
             secret_id = str(bemfa_config.get("secret_id", ""))
             secret_key = str(bemfa_config.get("secret_key", ""))
@@ -116,7 +116,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             bemfa_mqtt.set_on_message_callback(_mqtt_message_received)
             bemfa_sync_manager = BemfaDeviceSyncManager(
-                bemfa_uid, bemfa_api, bemfa_mqtt
+                hass, bemfa_uid, bemfa_api, bemfa_mqtt
             )
             if not await bemfa_mqtt.async_connect(timeout_seconds=5.0):
                 _LOGGER.warning(

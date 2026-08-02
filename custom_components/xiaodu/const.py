@@ -54,3 +54,9 @@ CLIMATE_TYPES = {ApplianceType.CLIMATE}
 COVER_TYPES = {ApplianceType.COVER}
 LOCK_TYPES = {"DOOR_LOCK"}
 BUTTON_TYPES = {"CLOTHES_RACK"}
+
+# create_entry 设备原始信息对照表中的字段标签。
+# 设备名/房间名本身为中文（小度生态），故标签也固定中文以保持一致；
+# 引导文案由 strings.json 的 create_entry 翻译键本地化。
+ORIG_LABEL = "原始"
+AREA_LABEL = "区域"

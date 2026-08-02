@@ -67,9 +67,12 @@ class XiaoduEntity(CoordinatorEntity[XiaoduCoordinator]):
             mapped_room = self.coordinator.room_mapping.get(
                 device.room_name, device.room_name
             )
+            room_tokens = self.coordinator.room_tokens
             return DeviceInfo(
                 identifiers={(DOMAIN, self._appliance_id)},
-                name=strip_room(device.friendly_name, device.room_name, mapped_room),
+                name=strip_room(
+                    device.friendly_name, device.room_name, mapped_room, room_tokens
+                ),
                 manufacturer="Xiaodu",
                 model=device.appliance_types[0] if device.appliance_types else None,
                 suggested_area=mapped_room or None,
