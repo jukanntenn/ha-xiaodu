@@ -72,6 +72,7 @@ prek update                          # 升级钩子版本（遵循 cooldown_days
 - 停止前：运行 `ruff check` + `basedpyright`；失败时输出 `{"decision": "block", "reason": ...}`——Claude Code / Codex / ZCode / Trae 四方原生一致的协议。**禁止输出 `continue: false`**（Codex 与 Trae 中其语义为"停止"且优先级更高，会反转意图）。
 - `basedpyright` 在停止钩子里以 `--baselinemode=discard` 运行——绝不写入基线。`stop_hook_active` 守卫防循环（Claude Code 与 Codex 的 Stop 输入字段）。
 - 配置格式均与官方源码/文档对齐：openai/codex、anomalyco/opencode、claude-code-docs、TRAE 官方文档、zcode-hooks-poc。
+- **hook 脚本必须带 shebang（`#!/usr/bin/env python3`）**：CI 的 ruff `EXE002`（可执行文件缺 shebang）会拦截；本地 WSL 下该规则被 ruff 显式豁免，存在"本地绿 CI 红"盲区，以 CI 为准。
 
 ## Home Assistant 集成备注
 

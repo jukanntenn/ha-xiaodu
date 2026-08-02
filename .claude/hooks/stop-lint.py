@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Stop hook: lint before the agent finishes.
 
 Runs `ruff check`, `ruff format --check`, and `basedpyright` (--baselinemode=discard).

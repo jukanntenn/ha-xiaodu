@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """PostToolUse hook: auto-format edited Python files with ruff.
 
 Silent on failure — formatting is best-effort and never blocks an edit.
