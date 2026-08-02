@@ -21,6 +21,7 @@ from homeassistant.helpers.selector import (
 from .api.exceptions import XiaoduApiError, XiaoduAuthError, XiaoduNetworkError
 from .api.xiaodu_client import XiaoduAPI
 from .const import (
+    AREA_LABEL,
     CONF_BEMFA_SECRET_ID,
     CONF_BEMFA_SECRET_KEY,
     CONF_BEMFA_UID,
@@ -29,7 +30,9 @@ from .const import (
     CONF_HOUSE_NAME,
     CONF_ROOM_MAPPING,
     DOMAIN,
+    ORIG_LABEL,
 )
+from .naming import strip_room
 from .room_mapping import RoomMapper
 
 if TYPE_CHECKING:
@@ -350,7 +353,47 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "appliance_types": appliance_types_list,
             },
             options=options,
+            description="device_overview",
+            description_placeholders={
+                "device_overview": self._format_device_overview()
+            },
         )
+
+    def _format_device_overview(self) -> str:
+        """生成「设备原始信息对照」的 Markdown 列表，供 create_entry 描述展示。
+
+        HA 在 config_flow 完成后会弹出内置的「命名和分配」步骤，每行显示
+        一个设备（设备名输入框 + HA 区域选择器）。但设备名在实体建立时
+        已被 ``strip_room`` 剥离了房间前缀（如「主卧射灯」→「射灯」），
+        用户在该步骤失去了设备的原始归属信息，无法核对自动分配的区域
+        是否正确。
+
+        本方法把每个设备的「剥离后名 + 原始名 + 所在房间 + HA 区域」
+        格式化为 Markdown 列表，通过 ``description_placeholders`` 注入到
+        ``create_entry`` 的描述里，渲染在「命名和分配」步骤的设备列表
+        上方，让用户对照核对。
+
+        仅当剥离后名与原始名不同时才标注「← 原始名」，避免冗余。
+        """
+        # 小度侧全部房间名——作为剥离锚点全集（与运行时一致）
+        room_tokens = {d.room_name for d in self._devices if d.room_name}
+        lines: list[str] = []
+        for d in self._devices:
+            name = d.friendly_name or d.appliance_id
+            room = d.room_name
+            mapped_room = self._room_mapping.get(room, room) if room else ""
+            stripped = (
+                strip_room(name, room, mapped_room, room_tokens) if room else name
+            )
+            room_part = f" @{room}" if room else ""
+            area_part = f" → HA {AREA_LABEL}[{mapped_room}]" if mapped_room else ""
+            if stripped != name:
+                lines.append(
+                    f"- **{stripped}** ← {ORIG_LABEL}「{name}」{room_part}{area_part}"
+                )
+            else:
+                lines.append(f"- **{stripped}**{room_part}{area_part}")
+        return "\n".join(lines)
 
     async def async_step_reauth(
         self, entry_data: dict[str, Any]

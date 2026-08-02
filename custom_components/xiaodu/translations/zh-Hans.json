@@ -47,7 +47,7 @@
             },
             "bemfa": {
                 "title": "巴法云配置",
-                "description": "通过巴法云，可使用智能音箱（如小爱同学）语音控制同步的设备。请选择认证方式。",
+                "description": "通过巴法云，可使用智能音箱（如小爱同学、小度）语音控制同步的设备。\n\n同步后将在巴法云自动创建以 **xdu** 开头的设备主题。要使语音控制生效，还需在米家 App 中绑定巴法云：我的 → 其他平台设备 → 添加 → 选择「巴法」→ 输入巴法云账号（即下方私钥对应的账号），设备即会自动同步到米家。\n\n请选择认证方式。",
                 "menu_options": {
                     "bemfa_v2": "v2 API（推荐，需实名认证）",
                     "bemfa_v1": "v1 旧版（仅私钥）",
@@ -87,6 +87,11 @@
                 "data_description": {
                     "cookie": "新的百度 BDUSS Cookie"
                 }
+            }
+        },
+        "create_entry": {
+            "default": {
+                "description": "以下设备即将导入 Home Assistant。设备名已去除房间前缀，此处列出每个设备的原始信息，便于您在下方核对区域分配是否正确。\n\n{device_overview}"
             }
         },
         "error": {

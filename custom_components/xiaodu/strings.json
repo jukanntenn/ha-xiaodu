@@ -47,7 +47,7 @@
             },
             "bemfa": {
                 "title": "Bemfa Cloud",
-                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant). Choose how to authenticate.",
+                "description": "Sync devices to Bemfa Cloud to enable voice control via smart speakers (e.g. Mi AI assistant, Xiaodu).\n\nAfter syncing, device topics prefixed with **xdu** will be created automatically on Bemfa Cloud. To activate voice control, you must also link Bemfa Cloud in the Mi Home app: Profile → Third-party devices → Add → select \"Bemfa\" → enter your Bemfa Cloud account (the one tied to the private key below). Devices will then sync to Mi Home automatically.\n\nChoose how to authenticate.",
                 "menu_options": {
                     "bemfa_v2": "v2 API (recommended, requires identity verification)",
                     "bemfa_v1": "v1 legacy (private key only)",
@@ -87,6 +87,11 @@
                 "data_description": {
                     "cookie": "Your new Baidu BDUSS cookie"
                 }
+            }
+        },
+        "create_entry": {
+            "default": {
+                "description": "The following devices will be added to Home Assistant. Their names have had the room prefix removed; the original information is listed below so you can verify the area assignment.\n\n{device_overview}"
             }
         },
         "error": {
