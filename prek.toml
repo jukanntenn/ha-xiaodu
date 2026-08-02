@@ -66,6 +66,18 @@ hooks = [
     { id = "ruff-pin-check", name = "ruff 双 pin 一致性（pyproject == prek.toml）", language = "system", entry = "uv run python scripts/check_ruff_pin.py", pass_filenames = false, files = "^(pyproject\\.toml|prek\\.toml)$" },
 ]
 
+# ── hassfest（HA 集成结构校验：manifest/strings/translations/codeowners 等）──
+# 复用官方 ghcr.io/home-assistant/hassfest 镜像，与 CI validate.yml 同源、同规则，
+# 上游更新镜像即自动跟进，无规则漂移。wrapper 脚本只挂载 custom_components 子目录：
+# 镜像 entrypoint 会 find . -name manifest.json，若挂整个仓库会扫到 .venv 内的 core
+# 集成 manifest（无 codeowners 字段）而误报 KeyError；Docker -v 不解析相对路径，
+# 故脚本内用 $(pwd) 解析绝对路径。无 Docker 时温和跳过，依赖 CI 兜底。
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "hassfest", name = "hassfest（HA 集成结构校验，官方镜像）", language = "system", entry = "scripts/hassfest.sh", pass_filenames = false, files = "^custom_components/.*\\.(json|py)$" },
+]
+
 # ── import 分层门控（import-linter，6 条 forbidden 契约）──
 [[repos]]
 repo = "local"

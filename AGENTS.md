@@ -29,6 +29,7 @@ prek install                         # 安装 git 钩子（每个 clone 一次�
 prek run                             # 手动运行钩子（仅暂存文件）
 prek run --all-files                 # 全仓运行钩子（与 CI lint 完全一致；push 前必须跑一次）
 prek update                          # 升级钩子版本（遵循 cooldown_days）
+./scripts/hassfest.sh                # hassfest 结构校验（manifest/strings/translations；复用官方镜像，与 CI validate.yml 同源；prek 已内嵌）
 ```
 
 ## 代码规范
@@ -42,6 +43,7 @@ prek update                          # 升级钩子版本（遵循 cooldown_days
 - 避免引入新的 `Any`——`basedpyright` 以 `all` 模式运行；存量 `Any` 冻结在 `.basedpyright/baseline.json`，新增的会被拦截。
 - 需要更新 `.basedpyright/baseline.json` 时，本地运行 `uv run basedpyright --writebaseline`；绝不让 CI 或钩子自动写入。
 - 优先使用具体的 HA 类型（`HomeAssistant`、`ConfigEntry`、`XiaoduCoordinator`），而非 `Any`。
+- `strings.json` / `translations/*.json` 的 `config.create_entry.*` 取值**必须是字符串**，禁止写成含 `description` 子键的 dict（那是 `step.*` 层级的结构）。`create_entry` 的文案通过 `description_placeholders` 注入占位符；`async_create_entry` 不传 `description` 时，HA 前端自动 fallback 到 `create_entry.default`。改动翻译后必须跑 hassfest（prek 已内嵌）。
 
 ## 测试规范
 
