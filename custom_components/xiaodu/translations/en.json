@@ -90,9 +90,7 @@
             }
         },
         "create_entry": {
-            "default": {
-                "description": "The following devices will be added to Home Assistant. Their names have had the room prefix removed; the original information is listed below so you can verify the area assignment.\n\n{device_overview}"
-            }
+            "default": "The following devices will be added to Home Assistant. Their names have had the room prefix removed; the original information is listed below so you can verify the area assignment.\n\n{device_overview}"
         },
         "error": {
             "invalid_cookie": "Invalid Cookie format",

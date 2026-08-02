@@ -353,7 +353,8 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "appliance_types": appliance_types_list,
             },
             options=options,
-            description="device_overview",
+            # 不传 description → HA 前端自动 fallback 到 strings.json 的
+            # config.create_entry.default，再用 description_placeholders 做模板替换。
             description_placeholders={
                 "device_overview": self._format_device_overview()
             },

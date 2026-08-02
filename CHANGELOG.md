@@ -2,6 +2,16 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 与 [语义化版本](https://semver.org/spec/v2.0.0.html)。当前处于 SemVer `0.x.x` 早期阶段，不承诺向后兼容；首个公开发布版本为 `0.1.0rc1`。
 
+## [Unreleased]
+
+### Fixed
+
+- 修复配置流程最后一步设备信息提示无法显示的问题（翻译文件结构错误导致 hassfest 校验失败）
+
+### Changed
+
+- 本地质量门控新增 hassfest 结构校验，与 CI 同源，提前拦截翻译文件结构错误
+
 ## [0.1.0rc1]
 
 首个公开发布的预发布版本，进入 Dogfooding 阶段。

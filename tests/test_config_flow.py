@@ -276,8 +276,10 @@ async def test_full_flow_without_bemfa(
     assert result["data"][CONF_COOKIE] == TEST_COOKIE
     assert result["data"][CONF_HOUSE_ID] == TEST_HOUSE_ID
     assert "bemfa" not in result["options"]
-    # create_entry 应携带设备原始信息对照，供 HA「命名和分配」步骤展示
-    assert result["description"] == "device_overview"
+    # create_entry 不传 description → HA 前端 fallback 到 strings.json 的
+    # config.create_entry.default。FlowResult 的 description 字段被 HA 显式
+    # 置为 None（默认参数），前端据此走 default 文案 + placeholders 替换。
+    assert result["description"] is None
     overview = result["description_placeholders"]["device_overview"]
     assert "Test Light 1" in overview
     # 设备名不含房间 token 时只展示一行精简格式（不带「← 原始」）

@@ -90,9 +90,7 @@
             }
         },
         "create_entry": {
-            "default": {
-                "description": "以下设备即将导入 Home Assistant。设备名已去除房间前缀，此处列出每个设备的原始信息，便于您在下方核对区域分配是否正确。\n\n{device_overview}"
-            }
+            "default": "以下设备即将导入 Home Assistant。设备名已去除房间前缀，此处列出每个设备的原始信息，便于您在下方核对区域分配是否正确。\n\n{device_overview}"
         },
         "error": {
             "invalid_cookie": "Cookie 格式无效",
