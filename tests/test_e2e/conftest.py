@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from aiohttp import web
-from aiohttp.test_utils import TestServer
 
 from tests.conftest import load_json_fixture
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from aiohttp.test_utils import TestServer
 
 
 @pytest.fixture(autouse=True)
@@ -103,7 +106,7 @@ async def api_server(
     server_handle.base = f"http://127.0.0.1:{server.port}"
 
     import custom_components.xiaodu as xiaodu_module
-    import custom_components.xiaodu.api.xiaodu_client as xiaodu_client
+    from custom_components.xiaodu.api import xiaodu_client
 
     monkeypatch = pytest.MonkeyPatch()
     # 集成入口（__init__.py）按调用时读取模块绑定的常量构造客户端，

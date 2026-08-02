@@ -1,5 +1,7 @@
 """巴法云（Bemfa）同步模块的常量定义。"""
 
+from __future__ import annotations
+
 BEMFA_BROKER = "bemfa.com"
 BEMFA_TLS_PORT = 9503
 BEMFA_USE_TLS = True

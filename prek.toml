@@ -20,7 +20,7 @@ hooks = [
 # ── Python lint + format ──
 [[repos]]
 repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.15.22"
+rev = "v0.16.1"
 hooks = [
     { id = "ruff-check", args = ["--fix", "--exit-non-zero-on-fix"] },
     { id = "ruff-format" },
@@ -63,6 +63,15 @@ hooks = [
 repo = "local"
 hooks = [
     { id = "uv-lock", name = "uv lock --check", language = "system", entry = "uv lock --check", pass_filenames = false, files = "^(pyproject\\.toml|uv\\.lock)$" },
+    { id = "ruff-pin-check", name = "ruff 双 pin 一致性（pyproject == prek.toml）", language = "system", entry = "uv run python scripts/check_ruff_pin.py", pass_filenames = false, files = "^(pyproject\\.toml|prek\\.toml)$" },
+]
+
+# ── import 分层门控（import-linter，6 条 forbidden 契约）──
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "import-linter", name = "import-linter（分层/循环依赖门控）", language = "system", entry = "uv run lint-imports --no-cache", pass_filenames = false, files = "^custom_components/.*\\.py$" },
+    { id = "deptry", name = "deptry（依赖卫生）", language = "system", entry = "uv run deptry .", pass_filenames = false, files = "^(custom_components/|tests/|pyproject\\.toml|uv\\.lock)" },
 ]
 
 # ── CLAUDE.md / AGENTS.md 一致性（独立维护，强制同步）──

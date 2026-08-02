@@ -1,5 +1,7 @@
 """Xiaodu API 模块。"""
 
+from __future__ import annotations
+
 from .exceptions import (
     XiaoduApiError,
     XiaoduAuthError,

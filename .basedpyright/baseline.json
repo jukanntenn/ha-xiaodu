@@ -2730,24 +2730,8 @@
             {
                 "code": "reportUnknownMemberType",
                 "range": {
-                    "startColumn": 61,
-                    "endColumn": 75,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportOptionalSubscript",
-                "range": {
-                    "startColumn": 61,
-                    "endColumn": 75,
-                    "lineCount": 1
-                }
-            },
-            {
-                "code": "reportUnknownArgumentType",
-                "range": {
-                    "startColumn": 61,
-                    "endColumn": 85,
+                    "startColumn": 23,
+                    "endColumn": 37,
                     "lineCount": 1
                 }
             },

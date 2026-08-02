@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+from typing import TYPE_CHECKING
 
-from homeassistant.core import HomeAssistant
 from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.const import (
@@ -26,6 +23,12 @@ from tests.const import (
     TEST_COOKIE,
     TEST_HOUSE_ID,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 
 def _register_bemfa_endpoints(aioclient_mock: AiohttpClientMocker) -> None:
@@ -105,7 +108,10 @@ async def test_mqtt_downlink_controls_device_and_reports_state(
     aioclient_mock.mock_calls.clear()
     bemfa_mqtt_probe.send(mapping.bemfa_topic, "on#80")
 
-    # 等待控制请求到达 Xiaodu HTTP
+    # 等待 TurnOn 与 SetBrightness 两条控制指令都到达 Xiaodu HTTP。
+    # coordinator 顺序执行两条指令，第二次请求可能晚几十毫秒到达——
+    # 必须等齐再断言，否则在 CI 调度下会偶发失败。
+    expected_commands = {"TurnOnRequest", "SetBrightnessPercentageRequest"}
     loop = asyncio.get_running_loop()
     deadline = loop.time() + 3
     control_calls = []
@@ -113,10 +119,13 @@ async def test_mqtt_downlink_controls_device_and_reports_state(
         control_calls = [
             c for c in aioclient_mock.mock_calls if "directivesend" in str(c[1])
         ]
-        if control_calls:
+        if {c[2]["header"]["name"] for c in control_calls} >= expected_commands:
             break
         await asyncio.sleep(0.02)
-    assert control_calls
+    actual_commands = {c[2]["header"]["name"] for c in control_calls}
+    assert actual_commands >= expected_commands, (
+        f"控制指令未等齐，实际收到: {sorted(actual_commands)}"
+    )
     body = control_calls[0][2]
     assert body["header"]["name"] == "TurnOnRequest"
     assert body["payload"]["parameters"]["attributeValue"] == "ON"

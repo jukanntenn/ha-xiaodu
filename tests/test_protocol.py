@@ -110,3 +110,46 @@ def test_parse_cover() -> None:
 
 def test_parse_unsupported_type() -> None:
     assert parse_command("DOOR_LOCK", "on") == []
+
+
+def test_parse_light_off_and_unsupported() -> None:
+    """灯光关闭、非法指令与 RGB 提示分支。"""
+    assert parse_command("LIGHT", "off") == [Command(action="turnOff")]
+    assert parse_command("LIGHT", "toggle") == []
+    assert parse_command("LIGHT", "on#80#FF0000") == [
+        Command(action="turnOn"),
+        Command(action="setBrightness", params={"attributeValue": 80}),
+    ]
+
+
+def test_parse_cover_invalid_position_and_unsupported() -> None:
+    """窗帘非法位置值与非 on/off/pause 指令分支。"""
+    assert parse_command("CURTAIN", "on#abc") == []
+    assert parse_command("CURTAIN", "open") == []
+
+
+def test_parse_climate_remaining_branches() -> None:
+    """空调非法指令、非法模式码、非法/超高风速与摆动提示分支。"""
+    assert parse_command("AIR_CONDITION", "heat") == []
+    assert parse_command("AIR_CONDITION", "on#8") == []
+    assert parse_command("AIR_CONDITION", "on#2#23#x") == [
+        Command(action="turnOn"),
+        Command(action="setMode", params={"mode": "cool"}),
+        Command(action="setTemperature", params={"target": 23}),
+    ]
+    assert parse_command("AIR_CONDITION", "on#2#23#9") == [
+        Command(action="turnOn"),
+        Command(action="setMode", params={"mode": "cool"}),
+        Command(action="setTemperature", params={"target": 23}),
+    ]
+    assert parse_command("AIR_CONDITION", "on#2#23#5") == [
+        Command(action="turnOn"),
+        Command(action="setMode", params={"mode": "cool"}),
+        Command(action="setTemperature", params={"target": 23}),
+    ]
+    assert parse_command("AIR_CONDITION", "on#2#23#3#x") == [
+        Command(action="turnOn"),
+        Command(action="setMode", params={"mode": "cool"}),
+        Command(action="setTemperature", params={"target": 23}),
+        Command(action="setFanSpeed", params={"speed": 3}),
+    ]

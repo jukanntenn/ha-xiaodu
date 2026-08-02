@@ -7,18 +7,24 @@ AIR_CONDITION devices map to climate entities.
 from __future__ import annotations
 
 import copy
+from typing import TYPE_CHECKING
 
 import pytest
 from homeassistant.components.climate import FAN_HIGH, FAN_MEDIUM, HVACMode
 from homeassistant.const import ATTR_TEMPERATURE
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
+    AiohttpClientMockResponse,
 )
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from tests.conftest import load_json_fixture
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 
 @pytest.mark.usefixtures("aioclient_mock_fixture")
@@ -366,3 +372,81 @@ async def test_climate_hvac_modes(
     assert HVACMode.AUTO in hvac_modes
     assert HVACMode.DRY in hvac_modes
     assert HVACMode.FAN_ONLY in hvac_modes
+
+
+async def test_climate_from_real_state_data(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """用真实抓取的气候状态（device_detail_climate.json）验证属性解析。
+
+    device_detail_climate.json 是抓取的真实气候详情：温度 16°C、制冷模式、
+    关机状态。stateSetting 应用到 climate 设备后，实体应正确解析。
+    """
+    device_list = copy.deepcopy(load_json_fixture("device_list.json"))
+    climate_state = load_json_fixture("device_detail_climate.json")["data"][
+        "appliance"
+    ]["stateSetting"]
+    for a in device_list["data"]["appliances"]:
+        if a["applianceId"] == "appliance_test_air_condition_001":
+            a["stateSetting"] = climate_state
+            break
+
+    call_count = 0
+
+    async def _side_effect(method, url, data):
+        nonlocal call_count
+        call_count += 1
+        if call_count > 1:
+            # 第二次刷新：模拟空调开机（turnOnState → on）
+            powered = copy.deepcopy(device_list)
+            for a in powered["data"]["appliances"]:
+                if a["applianceId"] == "appliance_test_air_condition_001":
+                    a["stateSetting"]["turnOnState"]["value"] = "on"
+                    break
+            return AiohttpClientMockResponse(
+                method=method, url=url, status=200, json=powered
+            )
+        return AiohttpClientMockResponse(
+            method=method, url=url, status=200, json=device_list
+        )
+
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/appliance",
+        side_effect=_side_effect,
+    )
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json=load_json_fixture("device_detail_climate.json"),
+    )
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/directivesend",
+        json=load_json_fixture("control_response_ok.json"),
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # 真实数据：关机状态（turnOnState=OFF）→ hvac_mode 报 OFF，温度正确解析
+    state = hass.states.get("climate.test_air_condition_1")
+    assert state is not None
+    assert state.state == HVACMode.OFF
+    assert state.attributes.get("current_temperature") == 16
+
+    # 开机后 → 制冷模式（mode=COOL；新版 HA 的 hvac_mode 由 state 表示）
+    coordinator = mock_config_entry.runtime_data
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    state = hass.states.get("climate.test_air_condition_1")
+    assert state is not None
+    assert state.state == HVACMode.COOL

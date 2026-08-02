@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import base64
+import copy
+from typing import TYPE_CHECKING, Any
+
 import pytest
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
+    AiohttpClientMockResponse,
 )
 
 from custom_components.xiaodu.api.xiaodu_types import Device
@@ -18,6 +21,8 @@ from custom_components.xiaodu.bemfa.const import (
     BEMFA_CREATE_TOPIC_URL,
     BEMFA_CREATE_TOPIC_V1_URL,
     BEMFA_DELETE_TOPIC_URL,
+    BEMFA_DEVICE_CONTROL_URL,
+    BEMFA_DEVICE_LIST_URL,
     BEMFA_MODIFY_NAME_URL,
     BEMFA_TOPIC_PREFIX,
 )
@@ -26,12 +31,20 @@ from custom_components.xiaodu.bemfa.sync_manager import (
     BemfaDeviceSyncManager,
     DeviceMapping,
 )
-from tests.conftest import MqttBrokerHandle, MqttProbe
+from tests.conftest import load_json_fixture
 from tests.const import (
     TEST_BEMFA_SECRET_ID,
     TEST_BEMFA_SECRET_KEY,
     TEST_BEMFA_UID,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
+
+    from tests.conftest import MqttBrokerHandle, MqttProbe
 
 
 def _device(appliance_id: str = "appliance_test_light_001") -> Device:
@@ -112,7 +125,10 @@ async def test_create_topic_v2_route(
 async def test_create_topic_exists_is_success(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 40006})
+    aioclient_mock.post(
+        BEMFA_CREATE_TOPIC_V1_URL,
+        json=load_json_fixture("create_topic_exists.json", "bemfa"),
+    )
     aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
     aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
     manager = _manager(hass)
@@ -454,3 +470,260 @@ async def test_nickname_unchanged_skips_modify_name(
     aioclient_mock.mock_calls.clear()
     await manager.sync_devices([_device()], {"次卧": "次卧"})
     assert not any("modifyName" in str(c[1]) for c in aioclient_mock.mock_calls)
+
+
+async def test_get_device_list_empty(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """空设备列表（device_list_ok.json 的 data.array 为空）。"""
+    aioclient_mock.get(
+        BEMFA_DEVICE_LIST_URL,
+        json=load_json_fixture("device_list_ok.json", "bemfa"),
+    )
+    api = BemfaAPIClient(
+        TEST_BEMFA_UID,
+        async_get_clientsession(hass),
+    )
+    devices = await api.get_device_list()
+    assert devices == []
+
+
+async def test_get_device_list_parses_devices(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """设备列表解析：topic/type/name 字段 + openID（base64 用户私钥）。"""
+    payload = copy.deepcopy(load_json_fixture("device_list_ok.json", "bemfa"))
+    payload["data"]["array"] = [
+        {"topic": "xdu1234567890a001", "type": 2, "name": "客厅灯"},
+        {"topic": "xdu1234567890a002", "type": 6, "name": "开关"},
+    ]
+    aioclient_mock.get(
+        BEMFA_DEVICE_LIST_URL,
+        json=payload,
+    )
+    api = BemfaAPIClient(
+        TEST_BEMFA_UID,
+        async_get_clientsession(hass),
+    )
+    devices = await api.get_device_list()
+    assert [(d.topic, d.device_type, d.name) for d in devices] == [
+        ("xdu1234567890a001", "2", "客厅灯"),
+        ("xdu1234567890a002", "6", "开关"),
+    ]
+
+
+async def test_control_device_sends_command(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """设备控制：openID/topicID/type/message 请求体 + 成功判定。"""
+    aioclient_mock.post(
+        BEMFA_DEVICE_CONTROL_URL,
+        json=load_json_fixture("control_device_ok.json", "bemfa"),
+    )
+    api = BemfaAPIClient(
+        TEST_BEMFA_UID,
+        async_get_clientsession(hass),
+    )
+    result = await api.control_device(
+        "xdu1234567890a001", {"on": True, "bri": 80}, device_type=2
+    )
+    assert result is True
+
+    calls = [c for c in aioclient_mock.mock_calls if "postMassage" in str(c[1])]
+    assert len(calls) == 1
+    body = calls[0][2]
+    expected_open_id = base64.b64encode(TEST_BEMFA_UID.encode()).decode()
+    assert body["openID"] == expected_open_id
+    assert body["topicID"] == "xdu1234567890a001"
+    assert body["type"] == 2
+    assert body["message"] == {"on": True, "bri": 80}
+
+
+async def test_api_request_non_dict_response(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """_request 收到非 dict 响应时返回 None 并判定失败。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json=[1, 2, 3])
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    result = await api.create_topic("xdu1234567890a001", "灯")
+    assert result.success is False
+
+
+async def test_api_request_timeout(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """_request 超时（TimeoutError）时返回 None 并判定失败。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, exc=TimeoutError("timeout"))
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    result = await api.create_topic("xdu1234567890a001", "灯")
+    assert result.success is False
+
+
+async def test_delete_topic_failure(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """deleteTopic 无响应与失败码分支（side_effect 按调用次数区分）。"""
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+
+    aioclient_mock.post(BEMFA_DELETE_TOPIC_URL, side_effect=_side_effect)
+    assert await api.delete_topic("xdu1234567890a001") is False
+    assert await api.delete_topic("xdu1234567890a001") is False
+
+
+async def test_change_topic_room_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """changeTopicRoom 无响应与失败码分支（side_effect 按调用次数区分）。"""
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, side_effect=_side_effect)
+    assert await api.change_topic_room(["xdu1234567890a001"], "客厅") is False
+    assert await api.change_topic_room(["xdu1234567890a001"], "客厅") is False
+
+
+async def test_change_topic_group_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """changeTopicGroup 无响应与失败码分支（side_effect 按调用次数区分）。"""
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, side_effect=_side_effect)
+    assert await api.change_topic_group(["xdu1234567890a001"], "默认分组") is False
+    assert await api.change_topic_group(["xdu1234567890a001"], "默认分组") is False
+
+
+async def test_modify_name_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """modifyName 无响应与失败码分支（注入测试 URL 避开 autouse 默认端点）。"""
+    api = BemfaAPIClient(
+        TEST_BEMFA_UID,
+        async_get_clientsession(hass),
+        modify_name_url="https://test.local/modify",
+    )
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+
+    aioclient_mock.post("https://test.local/modify", side_effect=_side_effect)
+    assert await api.modify_name("xdu1234567890a001", "灯") is False
+    assert await api.modify_name("xdu1234567890a001", "灯") is False
+
+
+async def test_list_topics_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """listTopics 无响应、失败码、异常响应结构分支（side_effect 按调用区分）。"""
+    api = BemfaAPIClient(
+        TEST_BEMFA_UID,
+        async_get_clientsession(hass),
+        all_topic_url="https://test.local/alltopic",
+    )
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        if call_count == 2:
+            return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+        return AiohttpClientMockResponse(
+            method, url, status=200, json={"code": 0, "data": {"nope": 1}}
+        )
+
+    aioclient_mock.get("https://test.local/alltopic", side_effect=_side_effect)
+    assert await api.list_topics() is None
+    assert await api.list_topics() is None
+    assert await api.list_topics() is None
+
+
+async def test_get_device_list_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """get_device_list 无响应、失败码、异常响应结构分支（side_effect 区分）。"""
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        if call_count == 2:
+            return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+        if call_count == 3:
+            return AiohttpClientMockResponse(
+                method, url, status=200, json={"code": 0, "data": "oops"}
+            )
+        return AiohttpClientMockResponse(
+            method, url, status=200, json={"code": 0, "data": {"array": "oops"}}
+        )
+
+    aioclient_mock.get(BEMFA_DEVICE_LIST_URL, side_effect=_side_effect)
+    assert await api.get_device_list() == []
+    assert await api.get_device_list() == []
+    assert await api.get_device_list() == []
+    assert await api.get_device_list() == []
+
+
+async def test_control_device_failures(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """control_device 无响应与失败码分支（side_effect 按调用次数区分）。"""
+    api = BemfaAPIClient(TEST_BEMFA_UID, async_get_clientsession(hass))
+    call_count = 0
+
+    async def _side_effect(
+        method: str, url: str, data: dict[str, Any] | None
+    ) -> AiohttpClientMockResponse:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            return AiohttpClientMockResponse(method, url, status=500, json=None)
+        return AiohttpClientMockResponse(method, url, status=200, json={"code": 1})
+
+    aioclient_mock.post(BEMFA_DEVICE_CONTROL_URL, side_effect=_side_effect)
+    assert await api.control_device("xdu1234567890a001", {"on": True}, 2) is False
+    assert await api.control_device("xdu1234567890a001", {"on": True}, 2) is False

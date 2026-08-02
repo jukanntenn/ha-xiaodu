@@ -7,16 +7,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.xiaodu.bemfa.const import BEMFA_TOPIC_PREFIX
 from custom_components.xiaodu.bemfa.sync_manager import DeviceMapping
-from tests.conftest import MqttBrokerHandle
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
+
+    from tests.conftest import MqttBrokerHandle
 
 DELETE_TOPIC_URL = "https://pro.bemfa.com/v1/deleteTopic"
 

@@ -50,6 +50,7 @@ jobs:
             --durations=10 \
             --cov=custom_components.xiaodu \
             --cov-report=xml \
+            --cov-fail-under=90 \
             tests
       - name: Upload coverage
         if: matrix.ha-target == 'latest'

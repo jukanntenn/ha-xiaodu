@@ -2,11 +2,11 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit|Write|MultiEdit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "command": "python '/home/alice/Workspace/hass-xiaodu/.codex/hooks/post-edit-format.py'"
+            "command": "python \"$(git rev-parse --show-toplevel)/.claude/hooks/post-edit-format.py\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python '/home/alice/Workspace/hass-xiaodu/.codex/hooks/stop-lint.py'"
+            "command": "python \"$(git rev-parse --show-toplevel)/.claude/hooks/stop-lint.py\""
           }
         ]
       }

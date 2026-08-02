@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .api.xiaodu_types import Command
 from .const import SOCKET_TYPES, SWITCH_TYPES
-from .coordinator import XiaoduCoordinator
 from .entity import XiaoduEntity
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from .coordinator import XiaoduCoordinator
 
 PARALLEL_UPDATES = 0
 

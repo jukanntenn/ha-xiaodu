@@ -5,18 +5,22 @@ Uses aioclient_mock to drive real XiaoduAPI execution (flo paradigm).
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.components.diagnostics import (
     get_diagnostics_for_config_entry,
 )
-from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 from custom_components.xiaodu.bemfa.sync_manager import DeviceMapping
 from custom_components.xiaodu.const import (
     CONF_COOKIE,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.typing import ClientSessionGenerator
 
 
 @pytest.mark.usefixtures("aioclient_mock_fixture")

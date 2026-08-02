@@ -11,9 +11,10 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from homeassistant.components.climate import HVACMode
 from homeassistant.config_entries import ConfigEntryState
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -36,7 +37,11 @@ from tests.const import (
     TEST_COOKIE,
     TEST_HOUSE_ID,
 )
-from tests.test_e2e.conftest import ApiServer
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+
+    from tests.test_e2e.conftest import ApiServer
 
 # All rooms for the selected device (appliance_test_light_001 is in 次卧)
 DEVICE_ROOM = "次卧"

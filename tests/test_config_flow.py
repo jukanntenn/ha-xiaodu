@@ -6,15 +6,11 @@ Uses aioclient_mock to drive real XiaoduAPI execution (flo paradigm).
 from __future__ import annotations
 
 from http import HTTPStatus
+from typing import TYPE_CHECKING
 
 import pytest
 from homeassistant import config_entries
-from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
 from custom_components.xiaodu.const import (
@@ -36,6 +32,13 @@ from tests.const import (
     TEST_HOUSE_ID,
     TEST_HOUSE_NAME,
 )
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 # The room for TEST_APPLIANCE_ID ("appliance_test_light_001") in the fixture
 DEVICE_ROOM = "次卧"
@@ -494,7 +497,7 @@ async def test_unique_id_already_configured(
 
 
 # ---------------------------------------------------------------------------
-# ConfigFlow: reauth
+# ConfigFlow — reauth
 # ---------------------------------------------------------------------------
 
 
@@ -598,7 +601,7 @@ async def test_options_flow_init_menu(
 
 
 # ---------------------------------------------------------------------------
-# OptionsFlow: room_mapping
+# OptionsFlow — room_mapping
 # ---------------------------------------------------------------------------
 
 
@@ -625,7 +628,7 @@ async def test_options_flow_room_mapping(
 
 
 # ---------------------------------------------------------------------------
-# OptionsFlow: bemfa
+# OptionsFlow — bemfa
 # ---------------------------------------------------------------------------
 
 
@@ -694,7 +697,7 @@ async def test_options_flow_bemfa_disable(
 
 
 # ---------------------------------------------------------------------------
-# OptionsFlow: reauth
+# OptionsFlow — reauth
 # ---------------------------------------------------------------------------
 
 
@@ -944,3 +947,283 @@ async def test_bemfa_partial_credentials_rejected(
     assert result["type"] == FlowResultType.FORM
     assert result["step_id"] == "bemfa_v2"
     assert result["errors"]["base"] == "bemfa_credentials_required"
+
+
+# ---------------------------------------------------------------------------
+# ConfigFlow: error branches
+# ---------------------------------------------------------------------------
+
+
+async def test_cookie_step_network_error(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """cookie 步骤 home_list 网络错误 → cannot_connect。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        status=HTTPStatus.INTERNAL_SERVER_ERROR,
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "cookie"
+    assert result["errors"]["base"] == "cannot_connect"
+
+
+async def test_cookie_step_api_error(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """cookie 步骤 home_list 业务错误 → cannot_connect。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json={"status": 1, "msg": "business error"},
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "cookie"
+    assert result["errors"]["base"] == "cannot_connect"
+
+
+async def test_home_step_auth_error(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """home 步骤设备列表认证失败 → auth_failed。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/appliance",
+        json=load_json_fixture("check_session_not_login.json"),
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "home"
+    assert result["errors"]["base"] == "auth_failed"
+
+
+async def test_device_step_empty_selection(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """device 步骤空选择 → 重新展示表单。"""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": []}
+    )
+
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "device"
+
+
+async def test_full_flow_bemfa_v1_uid_errors(
+    hass: HomeAssistant,
+    aioclient_mock_fixture: None,
+) -> None:
+    """v1 步骤空 uid 与非法 uid 分支。"""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "cookie"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: TEST_COOKIE}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOUSE_ID: TEST_HOUSE_ID}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"device_ids": [TEST_APPLIANCE_ID]}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], _room_mapping_form_data()
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"next_step_id": "bemfa_v1"}
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_BEMFA_UID: ""}
+    )
+    assert result["errors"]["base"] == "bemfa_credentials_required"
+
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_BEMFA_UID: "not_a_valid_uid"}
+    )
+    assert result["errors"]["base"] == "invalid_bemfa_uid"
+
+
+async def test_reauth_flow_network_error(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """reauth 网络错误 → cannot_connect。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        status=HTTPStatus.INTERNAL_SERVER_ERROR,
+    )
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN,
+        context={
+            "source": config_entries.SOURCE_REAUTH,
+            "entry_id": mock_config_entry.entry_id,
+        },
+        data=mock_config_entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_COOKIE: "new_cookie"}
+    )
+    assert result["errors"]["base"] == "cannot_connect"
+
+
+async def test_options_flow_bemfa_v2_uid_errors(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """OptionsFlow bemfa_v2 空凭据与非法 uid 分支。"""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "bemfa"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "bemfa_v2"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: "",
+            CONF_BEMFA_SECRET_ID: "",
+            CONF_BEMFA_SECRET_KEY: "",
+        },
+    )
+    assert result["errors"]["base"] == "bemfa_credentials_required"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"],
+        {
+            CONF_BEMFA_UID: "not_a_valid_uid",
+            CONF_BEMFA_SECRET_ID: TEST_BEMFA_SECRET_ID,
+            CONF_BEMFA_SECRET_KEY: TEST_BEMFA_SECRET_KEY,
+        },
+    )
+    assert result["errors"]["base"] == "invalid_bemfa_uid"
+
+
+async def test_options_flow_bemfa_v1(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """OptionsFlow bemfa_v1：空 uid、非法 uid、成功。"""
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "bemfa"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "bemfa_v1"}
+    )
+    assert result["type"] == FlowResultType.FORM
+    assert result["step_id"] == "bemfa_v1"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_BEMFA_UID: ""}
+    )
+    assert result["errors"]["base"] == "bemfa_credentials_required"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_BEMFA_UID: "bad_uid"}
+    )
+    assert result["errors"]["base"] == "invalid_bemfa_uid"
+
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_BEMFA_UID: TEST_BEMFA_UID}
+    )
+    assert result["type"] == FlowResultType.CREATE_ENTRY
+    assert result["data"]["bemfa"]["enabled"] is True
+    assert result["data"]["bemfa"]["secret_id"] == ""
+    assert result["data"]["bemfa"]["secret_key"] == ""
+
+
+async def test_options_flow_reauth_network_error(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """OptionsFlow reauth 网络错误 → cannot_connect。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        status=HTTPStatus.INTERNAL_SERVER_ERROR,
+    )
+    mock_config_entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(mock_config_entry.entry_id)
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {"next_step_id": "reauth"}
+    )
+    result = await hass.config_entries.options.async_configure(
+        result["flow_id"], {CONF_COOKIE: "new_cookie"}
+    )
+    assert result["errors"]["base"] == "cannot_connect"

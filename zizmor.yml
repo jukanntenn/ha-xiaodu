@@ -1,6 +1,0 @@
-rules:
-  template-injection:
-    ignore:
-      - release.yml
-  dependabot-cooldown:
-    disable: true

@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.components.diagnostics import async_redact_data
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_COOKIE,
     CONF_ROOM_MAPPING,
 )
-from .coordinator import XiaoduCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .coordinator import XiaoduCoordinator
 
 TO_REDACT = {
     CONF_COOKIE,
@@ -28,7 +31,7 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
     """返回配置条目（config entry）的诊断信息。"""
-    coordinator = cast(XiaoduCoordinator, entry.runtime_data)
+    coordinator = cast("XiaoduCoordinator", entry.runtime_data)
 
     devices_data = {}
     if coordinator.data:

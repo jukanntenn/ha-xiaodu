@@ -6,13 +6,17 @@ HEATER, AIR_FRESHER, SOCKET, SWITCH types map to SWITCH_TYPES in const.py.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pytest
 from homeassistant.components.switch import SwitchDeviceClass
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 
 @pytest.mark.usefixtures("aioclient_mock_fixture")

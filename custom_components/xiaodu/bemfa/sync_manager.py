@@ -7,18 +7,21 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-from ..api.xiaodu_types import Device
 from ..const import DEVICE_TYPE_SUFFIX_MAP
 from ..naming import strip_room
-from .api_client import BemfaAPIClient
 from .const import (
     BEMFA_RETRY_INTERVAL_SECONDS,
     BEMFA_TOPIC_HASH_LENGTH,
     BEMFA_TOPIC_PREFIX,
 )
-from .mqtt_client import BemfaMQTTClient
 from .protocol import encode_state
+
+if TYPE_CHECKING:
+    from ..api.xiaodu_types import Device
+    from .api_client import BemfaAPIClient
+    from .mqtt_client import BemfaMQTTClient
 
 _LOGGER = logging.getLogger(__name__)
 

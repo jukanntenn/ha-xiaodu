@@ -26,6 +26,7 @@ class BemfaMQTTClient:
         bemfa_uid: str,
         host: str = BEMFA_BROKER,
         port: int = BEMFA_TLS_PORT,
+        *,
         use_tls: bool = BEMFA_USE_TLS,
     ) -> None:
         self._bemfa_uid: str = bemfa_uid
@@ -51,7 +52,7 @@ class BemfaMQTTClient:
                 self._client.on_message = self._on_message
                 if self._use_tls:
                     self._client.tls_set(cert_reqs=ssl.CERT_NONE)
-                    self._client.tls_insecure_set(True)
+                    self._client.tls_insecure_set(value=True)
                 _LOGGER.debug(
                     "Connecting to Bemfa MQTT broker at %s:%s (tls=%s)",
                     self._host,

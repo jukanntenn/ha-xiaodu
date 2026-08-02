@@ -84,7 +84,7 @@ class XiaoduAPI:
             try:
                 async with self._session.request(method, url, **kwargs) as response:
                     if response.status in (401, 403):
-                        raise XiaoduAuthError()
+                        raise XiaoduAuthError()  # noqa: RSE102 - 显式实例化，语义更清晰
                     if response.status == 404:
                         raise XiaoduNotFoundError("unknown")
                     if response.status == 429:

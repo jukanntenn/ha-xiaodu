@@ -19,13 +19,15 @@
 uv sync                              # 安装全部开发依赖
 uv run pytest                        # 运行测试
 uv run pytest tests/test_light.py    # 运行单个测试文件
+uv run pytest --cov=custom_components.xiaodu --cov-fail-under=90 tests  # 覆盖率门控（与 CI tests job 一致）
 uv run ruff check                    # 代码检查
 uv run ruff check --fix              # 代码检查 + 自动修复
 uv run ruff format                   # 代码格式化
 uv run basedpyright                  # 类型检查（all 模式 + 基线）
 uv run ty check custom_components    # 类型检查（辅助二次校验，advisory）
-prek run                             # 对暂存文件运行 pre-commit 钩子
-prek run --all-files                 # 对全仓库运行钩子
+prek install                         # 安装 git 钩子（每个 clone 一次；commit 时自动对暂存文件跑钩子）
+prek run                             # 手动运行钩子（仅暂存文件）
+prek run --all-files                 # 全仓运行钩子（与 CI lint 完全一致；push 前必须跑一次）
 prek update                          # 升级钩子版本（遵循 cooldown_days）
 ```
 
@@ -52,17 +54,24 @@ prek update                          # 升级钩子版本（遵循 cooldown_days
 ## 提交与 Pull Request
 
 - 必须使用 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`ci:`、`chore:`。
-- Release Drafter 的自动标签器会把 commit 前缀映射到 changelog 分区——禁止手动打 PR 标签。
-- PR 标题不应包含 Conventional Commit 前缀（保持 release notes 整洁）。
+- Changelog 手写维护：每个版本在 `CHANGELOG.md` 新增 `## [版本号]` 条目（用户级中文描述，不含技术细节）。发布时打 `vX.Y.Z` tag，Release workflow 会自动创建 GitHub Release（正文取自 CHANGELOG，rc/beta 等预发布版本自动标记为 prerelease）并附带 `xiaodu.zip` 资产。
 
 ## AI Agent 钩子
 
-本仓库在 Claude Code 与 Codex 上配置了钩子，分别在编辑后与会话结束前运行：
+钩子脚本唯一来源：`.claude/hooks/`（`post-edit-format.py` 编辑后静默格式化；`stop-lint.py` 停止前门控）。各平台通过自身机制引用同一份脚本：
 
-- `Edit`/`Write`/`MultiEdit` 之后：被编辑的 Python 文件会自动用 `ruff format` + `ruff check --fix` 处理（静默，永不阻断）。
-- Agent 停止前：运行 `ruff check` + `basedpyright`；失败时钩子返回 block 决策，迫使 Agent 先修错误。`stop_hook_active` 守卫防止无限循环。
-- `basedpyright` 在停止钩子里以 `--baselinemode=discard` 运行——绝不写入基线。
-- Codex 用户：需在 `~/.codex/config.toml` 的 `[projects]` 里把本项目标记为 `trusted`，否则 `.codex/config.toml` 的钩子会被禁用。
+| 平台 | 配置位置 | 说明 |
+|---|---|---|
+| Claude Code | `.claude/settings.json` | PostToolUse（`Edit\|Write`）+ Stop，完整能力 |
+| Codex | `.codex/hooks.json` | 同上（Codex 官方标准位置；需在用户级 `~/.codex/config.toml` 的 `[projects]` 标记 `trusted` 并在 `/hooks` 里 review hooks） |
+| opencode | `.opencode/plugin/hooks.ts` | 仅 PostToolUse 静默格式化（opencode 的 hook 为旁路型，输出无法 block，Stop 检查不生效） |
+| ZCode | `.zcode/config.json` | PostToolUse + Stop（项目级 hooks） |
+| Trae | 无（复用 `.claude/settings.json`） | Trae 原生读取 Claude Code Hook 配置 |
+
+- 编辑后：被编辑的 Python 文件自动用 `ruff format` + `ruff check --fix` 处理（静默，永不阻断）。
+- 停止前：运行 `ruff check` + `basedpyright`；失败时输出 `{"decision": "block", "reason": ...}`——Claude Code / Codex / ZCode / Trae 四方原生一致的协议。**禁止输出 `continue: false`**（Codex 与 Trae 中其语义为"停止"且优先级更高，会反转意图）。
+- `basedpyright` 在停止钩子里以 `--baselinemode=discard` 运行——绝不写入基线。`stop_hook_active` 守卫防循环（Claude Code 与 Codex 的 Stop 输入字段）。
+- 配置格式均与官方源码/文档对齐：openai/codex、anomalyco/opencode、claude-code-docs、TRAE 官方文档、zcode-hooks-poc。
 
 ## Home Assistant 集成备注
 

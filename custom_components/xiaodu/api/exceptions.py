@@ -1,5 +1,7 @@
 """Xiaodu API 的异常定义。"""
 
+from __future__ import annotations
+
 
 class XiaoduError(Exception):
     """Xiaodu API 错误的基类异常。"""

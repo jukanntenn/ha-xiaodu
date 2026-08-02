@@ -142,7 +142,7 @@ def parse_command(device_type: str, message: str) -> list[Command]:
         if len(parts) >= 5:
             _LOGGER.warning("AC swing control not supported: %s", message)
         return commands
-    return []
+    return []  # pragma: no cover - defensive; every supported type returns above
 
 
 def _bemfa_int(raw: str, minimum: int, maximum: int) -> int | None:

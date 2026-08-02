@@ -1,11 +1,16 @@
 """Stop hook: lint before the agent finishes.
 
-Runs `ruff check` and `basedpyright` (--baselinemode=discard).
-On any failure, returns exit 0 with JSON {decision: block, reason: ...} so the
-agent is told to keep working. On success, exits 0 with no output.
+Runs `ruff check`, `ruff format --check`, and `basedpyright` (--baselinemode=discard).
+On any failure, returns exit 0 with JSON so the agent is told to keep working.
+On success, exits 0 with no output.
 
-The `stop_hook_active` field guards against infinite block loops: if the agent
-is already continuing from a prior block, this hook lets it stop.
+Output protocol（源码实证，四平台原生一致）:
+- Claude Code / Codex / ZCode / Trae 都读 `decision: block` + 非空 `reason`。
+- 绝不能输出 `continue: false`：Codex 与 Trae 中它的语义是"停止"且优先级
+  高于 `decision`，会把 block 意图反转。
+- 防循环：Claude Code 与 Codex 的 Stop 输入都有 `stop_hook_active` 字段
+  （Codex schema 实证），为 true 时直接放行；ZCode/Trae 用内置阻断次数
+  上限（loop_limit，默认 5）兜底。
 """
 
 from __future__ import annotations
@@ -44,7 +49,19 @@ def main() -> None:
     if proc.returncode != 0:
         errors.append("ruff check failed:\n" + (proc.stdout + proc.stderr).strip())
 
-    # 2. basedpyright (discard mode: read baseline, never write it)
+    # 2. ruff format --check (fast, mirrors the CI format gate)
+    proc = subprocess.run(
+        ["uv", "run", "ruff", "format", "--check", "custom_components", "tests"],
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        errors.append(
+            "ruff format --check failed:\n" + (proc.stdout + proc.stderr).strip()
+        )
+
+    # 3. basedpyright (discard mode: read baseline, never write it)
     proc = subprocess.run(
         ["uv", "run", "basedpyright", "--baselinemode=discard"],
         cwd=cwd,
@@ -59,7 +76,7 @@ def main() -> None:
             "Lint failed — fix all errors below before finishing the session:\n\n"
             + "\n\n".join(errors)
         )
-    # else: exit 0 with no output → agent may stop
+    # 非 error 分支：退出 0 无输出，允许结束会话
 
 
 if __name__ == "__main__":

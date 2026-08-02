@@ -5,9 +5,12 @@ from __future__ import annotations
 import asyncio
 import socket
 import threading
+from typing import TYPE_CHECKING
 
 from custom_components.xiaodu.bemfa.mqtt_client import BemfaMQTTClient
-from tests.conftest import MqttBrokerHandle, MqttProbe
+
+if TYPE_CHECKING:
+    from tests.conftest import MqttBrokerHandle, MqttProbe
 
 
 def _free_port() -> int:

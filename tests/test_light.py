@@ -7,17 +7,21 @@ LIGHT devices map to light entities.
 from __future__ import annotations
 
 import copy
+from typing import TYPE_CHECKING
 
 import pytest
 from homeassistant.components.light import ColorMode
-from homeassistant.core import HomeAssistant
-from pytest_homeassistant_custom_component.common import MockConfigEntry
-from pytest_homeassistant_custom_component.test_util.aiohttp import (
-    AiohttpClientMocker,
-)
 
 from custom_components.xiaodu.api.xiaodu_client import HOST
+from custom_components.xiaodu.light import XiaoduLight
 from tests.conftest import load_json_fixture
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from pytest_homeassistant_custom_component.test_util.aiohttp import (
+        AiohttpClientMocker,
+    )
 
 
 @pytest.mark.usefixtures("aioclient_mock_fixture")
@@ -319,3 +323,288 @@ async def test_light_command_body_turn_off(
     call_data = control_calls[0][2]
     assert call_data is not None
     assert call_data["header"]["name"] == "TurnOffRequest"
+
+
+async def _coordinator(
+    hass: HomeAssistant, mock_config_entry: MockConfigEntry
+) -> object:
+    """Setup 集成并返回 coordinator（供实体级断言直接实例化实体）。"""
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    return mock_config_entry.runtime_data
+
+
+async def test_light_properties_missing_device(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock_fixture: None,
+) -> None:
+    """设备不存在时所有属性回退默认值。"""
+    coordinator = await _coordinator(hass, mock_config_entry)
+    await hass.async_block_till_done()
+    light = XiaoduLight(coordinator, "appliance_missing")
+    assert light.is_on is False
+    assert light.brightness is None
+    assert light.color_temp_kelvin is None
+    assert light.min_color_temp_kelvin == 2000
+    assert light.max_color_temp_kelvin == 6535
+    assert light.effect is None
+
+
+async def test_light_brightness_edge_cases(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """BRIGHTNESS 模式灯：值计算、缺值回退；ONOFF 灯返回 None。"""
+    device_list = copy.deepcopy(load_json_fixture("device_list.json"))
+    device_list["data"]["appliances"][0]["stateSetting"]["brightness"] = {
+        "name": "亮度",
+        "value": 80,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueRangeMap": {"min": 1, "max": 100},
+        "time": "2026-07-25 00:00:00",
+    }
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(f"{HOST}/saiya/smarthome/appliance", json=device_list)
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json=load_json_fixture("device_detail_light.json"),
+    )
+
+    coordinator = await _coordinator(hass, mock_config_entry)
+    await hass.async_block_till_done()
+
+    light = XiaoduLight(coordinator, "appliance_test_light_001")
+    assert light.brightness == round(80 / 100 * 255)
+
+    # value 缺失时回退 None
+    coordinator.data["appliance_test_light_001"].state_setting["brightness"][
+        "value"
+    ] = None
+    assert light.brightness is None
+
+    # 设备消失时回退 None
+    del coordinator.data["appliance_test_light_001"]
+    assert light.brightness is None
+
+
+async def test_light_color_temp_edge_cases(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """COLOR_TEMP 模式灯：开尔文换算、缺值/缺范围回退。"""
+    device_list = copy.deepcopy(load_json_fixture("device_list.json"))
+    device_list["data"]["appliances"][0]["stateSetting"]["brightness"] = {
+        "name": "亮度",
+        "value": 80,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueRangeMap": {"min": 1, "max": 100},
+        "time": "2026-07-25 00:00:00",
+    }
+    device_list["data"]["appliances"][0]["stateSetting"]["colorTemperatureInKelvin"] = {
+        "name": "色温",
+        "value": 50,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueKelvinRangeMap": {"min": 2700, "max": 6500},
+        "time": "2026-07-25 00:00:00",
+    }
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(f"{HOST}/saiya/smarthome/appliance", json=device_list)
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json=load_json_fixture("device_detail_light.json"),
+    )
+
+    coordinator = await _coordinator(hass, mock_config_entry)
+    await hass.async_block_till_done()
+
+    light = XiaoduLight(coordinator, "appliance_test_light_001")
+    assert light.color_temp_kelvin == round(50 / 100 * 3800) + 2700
+
+    # value 缺失 → None
+    coordinator.data["appliance_test_light_001"].state_setting[
+        "colorTemperatureInKelvin"
+    ]["value"] = None
+    assert light.color_temp_kelvin is None
+
+    # 范围缺失 → None
+    coordinator.data["appliance_test_light_001"].state_setting[
+        "colorTemperatureInKelvin"
+    ] = {"value": 50}
+    assert light.color_temp_kelvin is None
+
+    # 设备消失时回退 None
+    del coordinator.data["appliance_test_light_001"]
+    assert light.color_temp_kelvin is None
+
+    # ONOFF 模式灯（无 brightness/colorTemperatureInKelvin）→ 属性 None
+    onoff_light = XiaoduLight(coordinator, "appliance_test_light_002")
+    assert onoff_light.brightness is None
+    assert onoff_light.color_temp_kelvin is None
+
+
+async def test_light_setup_empty_device_list(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """设备列表为空时 discover 不创建实体。"""
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/appliance",
+        json={"status": 0, "msg": "success", "data": {"appliances": []}},
+    )
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json={"code": 0, "data": []},
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.states.async_all("light") == []
+
+
+async def test_light_turn_on_with_brightness_command(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """turn_on 带 brightness 发送 SetBrightnessPercentageRequest。"""
+    device_list = copy.deepcopy(load_json_fixture("device_list.json"))
+    device_list["data"]["appliances"][0]["stateSetting"]["brightness"] = {
+        "name": "亮度",
+        "value": 80,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueRangeMap": {"min": 1, "max": 100},
+        "time": "2026-07-25 00:00:00",
+    }
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(f"{HOST}/saiya/smarthome/appliance", json=device_list)
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json=load_json_fixture("device_detail_light.json"),
+    )
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/directivesend",
+        json=load_json_fixture("control_response_ok.json"),
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    aioclient_mock.mock_calls.clear()
+
+    await hass.services.async_call(
+        "light",
+        "turn_on",
+        {"entity_id": "light.test_light_1", "brightness": 51},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    control_calls = [
+        c for c in aioclient_mock.mock_calls if "directivesend" in str(c[1])
+    ]
+    assert len(control_calls) == 1
+    call_data = control_calls[0][2]
+    assert call_data is not None
+    assert call_data["header"]["name"] == "SetBrightnessPercentageRequest"
+
+
+async def test_light_turn_on_with_color_temp_command(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock: AiohttpClientMocker,
+) -> None:
+    """turn_on 带 color_temp_kelvin 发送 SetColorTemperatureRequest。"""
+    device_list = copy.deepcopy(load_json_fixture("device_list.json"))
+    device_list["data"]["appliances"][0]["stateSetting"]["brightness"] = {
+        "name": "亮度",
+        "value": 80,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueRangeMap": {"min": 1, "max": 100},
+        "time": "2026-07-25 00:00:00",
+    }
+    device_list["data"]["appliances"][0]["stateSetting"]["colorTemperatureInKelvin"] = {
+        "name": "色温",
+        "value": 50,
+        "valueType": "NUM",
+        "scale": "%",
+        "valueKelvinRangeMap": {"min": 2700, "max": 6500},
+        "time": "2026-07-25 00:00:00",
+    }
+    aioclient_mock.post(
+        f"{HOST}/appserver/gateway/app/v1",
+        json=load_json_fixture("check_session_ok.json"),
+    )
+    aioclient_mock.post(
+        f"{HOST}/saiya/smarthome/multihouse",
+        json=load_json_fixture("home_list.json"),
+    )
+    aioclient_mock.post(f"{HOST}/saiya/smarthome/appliance", json=device_list)
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/appliancedetails",
+        json=load_json_fixture("device_detail_light.json"),
+    )
+    aioclient_mock.get(
+        f"{HOST}/saiya/smarthome/directivesend",
+        json=load_json_fixture("control_response_ok.json"),
+    )
+
+    mock_config_entry.add_to_hass(hass)
+    assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+    aioclient_mock.mock_calls.clear()
+
+    await hass.services.async_call(
+        "light",
+        "turn_on",
+        {"entity_id": "light.test_light_1", "color_temp_kelvin": 4700},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    control_calls = [
+        c for c in aioclient_mock.mock_calls if "directivesend" in str(c[1])
+    ]
+    assert len(control_calls) == 1
+    call_data = control_calls[0][2]
+    assert call_data is not None
+    assert call_data["header"]["name"] == "SetColorTemperatureRequest"

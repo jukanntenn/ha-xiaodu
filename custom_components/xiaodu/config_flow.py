@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
+from homeassistant.helpers import area_registry
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
     SelectOptionDict,
@@ -19,7 +20,6 @@ from homeassistant.helpers.selector import (
 
 from .api.exceptions import XiaoduApiError, XiaoduAuthError, XiaoduNetworkError
 from .api.xiaodu_client import XiaoduAPI
-from .api.xiaodu_types import Device
 from .const import (
     CONF_BEMFA_SECRET_ID,
     CONF_BEMFA_SECRET_KEY,
@@ -31,6 +31,9 @@ from .const import (
     DOMAIN,
 )
 from .room_mapping import RoomMapper
+
+if TYPE_CHECKING:
+    from .api.xiaodu_types import Device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,7 +60,7 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @staticmethod
     @callback
     def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
+        config_entry: config_entries.ConfigEntry,  # noqa: ARG004 - HA 固定签名，参数未用
     ) -> XiaoduOptionsFlow:
         """创建选项流程（options flow）。"""
         return XiaoduOptionsFlow()
@@ -113,7 +116,9 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             self._house_id = user_input[CONF_HOUSE_ID]
             self._house_name = self._homes.get(self._house_id, "")
-            if self._api is None:
+            if (
+                self._api is None
+            ):  # pragma: no cover - defensive; home step is only reachable after cookie auth
                 return self.async_abort(reason="cannot_connect")
             try:
                 self._devices = await self._api.get_device_list(self._house_id)
@@ -210,8 +215,6 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_bemfa()
 
         # 获取 HA 区域（areas）
-        from homeassistant.helpers import area_registry
-
         ar = area_registry.async_get(self.hass)
         ha_areas = [area.name for area in ar.async_list_areas()]
 
@@ -420,8 +423,6 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
             )
 
         current_mapping = self.config_entry.options.get(CONF_ROOM_MAPPING, {})
-        from homeassistant.helpers import area_registry
-
         ar = area_registry.async_get(self.hass)
         ha_areas = [area.name for area in ar.async_list_areas()]
 
@@ -440,7 +441,9 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
         self, _user_input: dict[str, object] | None = None
     ) -> config_entries.ConfigFlowResult:
         """处理 Bemfa（巴法云）配置的修改——选择认证方式或禁用。"""
-        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
+        current_bemfa = cast(
+            "dict[str, str]", self.config_entry.options.get("bemfa", {})
+        )
         menu_options = ["bemfa_v2", "bemfa_v1"]
         if current_bemfa.get("enabled"):
             menu_options.append("bemfa_disable")
@@ -454,7 +457,9 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """处理 v2 认证配置的修改。"""
         errors: dict[str, str] = {}
-        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
+        current_bemfa = cast(
+            "dict[str, str]", self.config_entry.options.get("bemfa", {})
+        )
         if user_input is not None:
             uid = user_input[CONF_BEMFA_UID].strip()
             secret_id = user_input[CONF_BEMFA_SECRET_ID].strip()
@@ -501,7 +506,9 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.ConfigFlowResult:
         """处理 v1 认证配置的修改。"""
         errors: dict[str, str] = {}
-        current_bemfa = cast(dict[str, str], self.config_entry.options.get("bemfa", {}))
+        current_bemfa = cast(
+            "dict[str, str]", self.config_entry.options.get("bemfa", {})
+        )
         if user_input is not None:
             uid = user_input[CONF_BEMFA_UID].strip()
             if not uid:

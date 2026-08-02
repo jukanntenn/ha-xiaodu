@@ -5,18 +5,21 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api.exceptions import XiaoduApiError, XiaoduAuthError, XiaoduNetworkError
-from .api.xiaodu_client import XiaoduAPI
 from .api.xiaodu_types import Command, Device
-from .bemfa.sync_manager import BemfaDeviceSyncManager
 from .const import CONF_ROOM_MAPPING, DOMAIN, SCAN_INTERVAL
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+
+    from .api.xiaodu_client import XiaoduAPI
+    from .bemfa.sync_manager import BemfaDeviceSyncManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -137,7 +140,7 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
                     _ = await self.bemfa_sync_manager.update_device_state(
                         device_id, new_device.state_setting
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001 - Bemfa 发布失败仅记日志，不阻断控制流程
                     _LOGGER.debug("Failed to publish state change for %s", device_id)
 
     async def control_device(
@@ -181,7 +184,14 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
             return
         for command in commands:
             if command.action == "setTemperature":
-                await self._adjust_temperature(appliance_id, command.params["target"])
+                if not command.params:
+                    _LOGGER.warning(
+                        "setTemperature 指令缺少参数，已跳过: %s", command.action
+                    )
+                    continue
+                await self._adjust_temperature(
+                    appliance_id, cast("int", command.params["target"])
+                )
             else:
                 _ = await self.control_device(
                     appliance_id,
@@ -253,7 +263,7 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
                     _ = await self.bemfa_sync_manager.update_device_state(
                         appliance_id, device.state_setting
                     )
-                except Exception:
+                except Exception:  # noqa: BLE001 - Bemfa 发布失败仅记日志，不阻断控制流程
                     _LOGGER.debug(
                         "Failed to sync control to Bemfa for %s", appliance_id
                     )

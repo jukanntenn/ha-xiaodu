@@ -3,13 +3,10 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_validation import config_entry_only_config_schema
-from homeassistant.helpers.device_registry import DeviceEntry
 
 from .api.xiaodu_client import HOST, XiaoduAPI
 from .bemfa import (
@@ -29,12 +26,18 @@ from .bemfa.const import (
     BEMFA_TLS_PORT,
     BEMFA_USE_TLS,
 )
+from .bemfa.protocol import parse_command
 from .const import (
     CONF_COOKIE,
     DOMAIN,
     PLATFORMS,
 )
 from .coordinator import XiaoduCoordinator
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.device_registry import DeviceEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -88,7 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     _LOGGER.debug(
                         "Bemfa MQTT downlink: topic=%s payload=%s", topic, payload
                     )
-                    coordinator = cast(XiaoduCoordinator, entry.runtime_data)
+                    coordinator = cast("XiaoduCoordinator", entry.runtime_data)
                     if not coordinator.bemfa_sync_manager:
                         return
                     appliance_id = (
@@ -102,8 +105,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     mapping = coordinator.bemfa_sync_manager.device_mapping[
                         appliance_id
                     ]
-                    from .bemfa.protocol import parse_command
-
                     commands = parse_command(mapping.device_type, payload)
                     _LOGGER.debug("Bemfa MQTT downlink commands: %s", commands)
                     if commands:

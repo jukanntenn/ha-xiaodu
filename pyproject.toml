@@ -20,51 +20,59 @@ dev = [
     "pytest-mock>=3.0",
     "pytest-timeout>=2.0",
     "pytest-homeassistant-custom-component",
-    "ruff==0.15.22",
+    "ruff==0.16.1",
     "basedpyright",
     "ty",
     "codespell>=2.4",
     "tomli>=2.0; python_version < '3.11'",
     "amqtt>=0.11.4,<0.12",
+    "import-linter>=2.13",
+    "deptry>=0.25.1",
 ]
 
 [tool.ruff]
 line-length = 88
 target-version = "py313"
-exclude = ["collect.py"]
+src = ["."]  # 让 isort 把 custom_components/、tests/ 识别为 first-party
 
 [tool.ruff.lint]
-select = [
-    "A",     # flake8-builtins（builtin shadowing）
-    "ASYNC", # flake8-async
-    "B",     # flake8-bugbear
-    "C4",    # flake8-comprehensions
-    "DTZ",   # flake8-datetimez（时区安全）
-    "E",     # pycodestyle errors
-    "F",     # pyflakes
-    "FURB",  # refurb
-    "I",     # isort
-    "LOG",   # flake8-logging
-    "N",     # pep8-naming
-    "PERF",  # perflint
-    "PGH",   # pygrep-hooks
-    "PIE",   # flake8-pie
-    "PT",    # flake8-pytest-style
-    "PTH",   # flake8-pathlib
-    "RET",   # flake8-return
-    "RUF",   # ruff 专属
-    "S",     # flake8-bandit（安全子集）
-    "SIM",   # flake8-simplify
-    "UP",    # pyupgrade
-    "W",     # pycodestyle warnings
+select = ["ALL"]
+ignore = [
+    # —— 整族关闭（本项目不适用 / 风格不强制）——
+    "D",     # pydocstyle: 中文 docstring 与英文标点规则（D400/D415）冲突；不强制 docstring
+    "DOC",   # docstring content: 同 D
+    "ANN",   # annotations: 类型由 basedpyright（all 模式）把关
+    "CPY",   # copyright: 无版权声明规约
+    "EM",    # exception message style: 异常消息风格，暂不强制
+    "TRY",   # exception class style: 同上
+    # —— pylint 主观阈值（教条，按需开启）——
+    "PLR2004",  # magic-value-comparison: HTTP 状态码/设备类型码等场景不合理
+    "PLR0911",  # too-many-return-statements
+    "PLR0912",  # too-many-branches
+    "PLR0913",  # too-many-arguments
+    "PLR0915",  # too-many-statements
+    "C901",     # complex-structure
+    # —— unused arguments（接口实现/回调常有未用参数，噪音大）——
+    "ARG001", "ARG002", "ARG005",
+    # —— 与 formatter 冲突（ruff 官方要求 ignore）——
+    "COM812",  # trailing comma: formatter 接管
+    "ISC001",  # implicit string concat: formatter 接管
+    "E501",    # line-too-long: formatter 按 line-length 接管
+    # —— HA custom component 结构性约束 ——
+    "INP001",  # custom_components 是 namespace package（HA 惯例，无 __init__.py）
+    "TID252",  # 全仓统一相对导入惯例（from .. 是到达包根的规范写法）
 ]
 # 中文 docstring/注释允许使用全角标点与箭头（中文排版需要）
 allowed-confusables = ["（", "）", "，", "：", "；", "→"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]  # 测试代码允许 assert
-".claude/hooks/**" = ["SIM105", "S603", "S607"]  # hook 脚本
-".codex/hooks/**" = ["SIM105", "S603", "S607"]  # hook 脚本（与 .claude/hooks 一致）
+"tests/**" = [
+    "S101",    # 测试代码允许 assert
+    "SLF001",  # 白盒检查内部状态是测试的合理用例
+    "PLC0415", # 测试内函数级 import（避免 tests 包循环导入 / 配合 monkeypatch）
+]
+".claude/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Codex 与 Claude 共用）
+"scripts/**" = ["T201"]  # CLI 检查脚本需要 stdout/stderr 输出
 
 [tool.ruff.format]
 quote-style = "double"
@@ -91,6 +99,115 @@ include = ["custom_components"]
 skip = "*.json,*.lock,*.svg,*.ambr,.git,.venv,.local,uv.lock,tests/fixtures"
 ignore-words-list = ["hass"]
 
+[tool.importlinter]
+root_package = "custom_components.xiaodu"
+# TYPE_CHECKING 块里的 import 是 Python 官方推荐的解耦手段，运行时不执行，不算依赖
+exclude_type_checking_imports = true
+
+# 分层约定：platform → entity → coordinator → api/bemfa（禁止反向依赖）
+# 工具叶子：const / naming / room_mapping；入口：config_flow / diagnostics
+
+[[tool.importlinter.contracts]]
+name = "Platform modules must not depend on Bemfa"
+type = "forbidden"
+source_modules = [
+    "custom_components.xiaodu.button",
+    "custom_components.xiaodu.climate",
+    "custom_components.xiaodu.cover",
+    "custom_components.xiaodu.light",
+    "custom_components.xiaodu.lock",
+    "custom_components.xiaodu.switch",
+    "custom_components.xiaodu.entity",
+]
+forbidden_modules = ["custom_components.xiaodu.bemfa"]
+
+[[tool.importlinter.contracts]]
+name = "Coordinator must not depend on platforms or entity"
+type = "forbidden"
+source_modules = ["custom_components.xiaodu.coordinator"]
+forbidden_modules = [
+    "custom_components.xiaodu.button",
+    "custom_components.xiaodu.climate",
+    "custom_components.xiaodu.cover",
+    "custom_components.xiaodu.light",
+    "custom_components.xiaodu.lock",
+    "custom_components.xiaodu.switch",
+    "custom_components.xiaodu.entity",
+]
+
+[[tool.importlinter.contracts]]
+name = "API layer must not depend on Bemfa, utilities, or upper layers"
+type = "forbidden"
+source_modules = ["custom_components.xiaodu.api"]
+forbidden_modules = [
+    "custom_components.xiaodu.bemfa",
+    "custom_components.xiaodu.const",
+    "custom_components.xiaodu.naming",
+    "custom_components.xiaodu.room_mapping",
+    "custom_components.xiaodu.button",
+    "custom_components.xiaodu.climate",
+    "custom_components.xiaodu.cover",
+    "custom_components.xiaodu.light",
+    "custom_components.xiaodu.lock",
+    "custom_components.xiaodu.switch",
+    "custom_components.xiaodu.coordinator",
+    "custom_components.xiaodu.entity",
+    "custom_components.xiaodu.config_flow",
+    "custom_components.xiaodu.diagnostics",
+]
+
+[[tool.importlinter.contracts]]
+name = "Bemfa layer must not depend on upper layers"
+type = "forbidden"
+source_modules = ["custom_components.xiaodu.bemfa"]
+forbidden_modules = [
+    "custom_components.xiaodu.button",
+    "custom_components.xiaodu.climate",
+    "custom_components.xiaodu.cover",
+    "custom_components.xiaodu.light",
+    "custom_components.xiaodu.lock",
+    "custom_components.xiaodu.switch",
+    "custom_components.xiaodu.coordinator",
+    "custom_components.xiaodu.entity",
+    "custom_components.xiaodu.config_flow",
+    "custom_components.xiaodu.diagnostics",
+]
+
+[[tool.importlinter.contracts]]
+name = "Utility leaves must not depend on upper layers or Bemfa"
+type = "forbidden"
+source_modules = [
+    "custom_components.xiaodu.const",
+    "custom_components.xiaodu.naming",
+    "custom_components.xiaodu.room_mapping",
+]
+forbidden_modules = [
+    "custom_components.xiaodu.bemfa",
+    "custom_components.xiaodu.button",
+    "custom_components.xiaodu.climate",
+    "custom_components.xiaodu.cover",
+    "custom_components.xiaodu.light",
+    "custom_components.xiaodu.lock",
+    "custom_components.xiaodu.switch",
+    "custom_components.xiaodu.coordinator",
+    "custom_components.xiaodu.entity",
+    "custom_components.xiaodu.config_flow",
+    "custom_components.xiaodu.diagnostics",
+]
+
+[[tool.importlinter.contracts]]
+name = "Entry points must not depend on Bemfa"
+type = "forbidden"
+source_modules = [
+    "custom_components.xiaodu.config_flow",
+    "custom_components.xiaodu.diagnostics",
+]
+forbidden_modules = ["custom_components.xiaodu.bemfa"]
+
+[tool.deptry]
+# HA 运行时提供这些包（不进依赖声明），属传递依赖属性质疑（DEP003）
+per_rule_ignores = { "DEP003" = ["homeassistant", "aiohttp", "voluptuous"] }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
@@ -99,6 +216,7 @@ addopts = [
     "-v",
     "--tb=short",
     "--strict-markers",
+    "--timeout=9",
 ]
 
 [tool.uv]

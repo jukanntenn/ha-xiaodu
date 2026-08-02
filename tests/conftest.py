@@ -9,9 +9,8 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import paho.mqtt.client as mqtt
 import pytest
@@ -46,6 +45,9 @@ from tests.const import (
     TEST_HOUSE_NAME,
     TEST_ROOM_NAME,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
@@ -159,12 +161,12 @@ def aioclient_mock_fixture(aioclient_mock: AiohttpClientMocker) -> None:
         f"{HOST}/saiya/smarthome/multihouse",
         json=load_json_fixture("home_list.json"),
     )
-    # get_device_list (initial)
+    # 首次拉取 device_list
     aioclient_mock.post(
         f"{HOST}/saiya/smarthome/appliance",
         json=load_json_fixture("device_list.json"),
     )
-    # get_device_detail (light)
+    # 拉取 light 设备详情
     aioclient_mock.get(
         f"{HOST}/saiya/smarthome/appliancedetails",
         json=load_json_fixture("device_detail_light.json"),

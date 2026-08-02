@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from tests.conftest import MqttProbe
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tests.conftest import MqttProbe
 
 
 async def test_broker_and_probe_roundtrip(bemfa_mqtt_probe: MqttProbe) -> None:
