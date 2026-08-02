@@ -49,12 +49,65 @@ from tests.const import (
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.device_registry import DeviceEntry
+
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 def load_json_fixture(filename: str, subdir: str = "xiaodu") -> dict[str, Any]:
     """Load a JSON fixture file."""
     return json.loads((FIXTURES_DIR / subdir / filename).read_text(encoding="utf-8"))
+
+
+def register_xiaodu_device(
+    hass: HomeAssistant,
+    appliance_id: str,
+    *,
+    area_name: str | None = None,
+    name_by_user: str | None = None,
+    device_name: str | None = None,
+    config_entry_id: str = "test",
+) -> DeviceEntry:
+    """在 device registry 注册一个小度设备，可选分配区域/改名。
+
+    用于巴法云昵称跟随测试：模拟实体建立后 device_registry 里的状态，
+    让 ``_resolve_ha_device`` 能反查到带 area_id/name_by_user 的设备条目。
+
+    Args:
+        hass: Home Assistant 实例。
+        appliance_id: 小度 appliance ID。
+        area_name: 若给定，创建/取回该区域并分配给设备。
+        name_by_user: 若给定，设为设备的用户自定义名（HA 设备页改名）。
+        device_name: 若给定，设为集成的设备名（entity.py device_info.name）。
+        config_entry_id: 关联的 config entry id。
+
+    Returns:
+        创建/更新后的 DeviceEntry。
+    """
+    from homeassistant.helpers import area_registry as ar
+    from homeassistant.helpers import device_registry as dr
+
+    # 确保 config entry 存在（device 必须关联到已知 config entry）
+    if hass.config_entries.async_get_entry(config_entry_id) is None:
+        entry = MockConfigEntry(domain=DOMAIN, entry_id=config_entry_id)
+        entry.add_to_hass(hass)
+
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get_or_create(
+        config_entry_id=config_entry_id,
+        connections={},
+        identifiers={(DOMAIN, appliance_id)},
+        name=device_name,
+    )
+    if name_by_user is not None:
+        device_entry = registry.async_update_device(
+            device_entry.id, name_by_user=name_by_user
+        )
+    if area_name:
+        area_id = ar.async_get(hass).async_get_or_create(area_name).id
+        device_entry = registry.async_update_device(device_entry.id, area_id=area_id)
+    return device_entry
 
 
 def register_bemfa_endpoints(aioclient_mock: AiohttpClientMocker) -> None:

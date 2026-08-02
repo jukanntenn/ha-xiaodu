@@ -31,7 +31,7 @@ from custom_components.xiaodu.bemfa.sync_manager import (
     BemfaDeviceSyncManager,
     DeviceMapping,
 )
-from tests.conftest import load_json_fixture
+from tests.conftest import load_json_fixture, register_xiaodu_device
 from tests.const import (
     TEST_BEMFA_SECRET_ID,
     TEST_BEMFA_SECRET_KEY,
@@ -77,7 +77,7 @@ def _manager(
         secret_key=secret_key,
     )
     mqtt_client = BemfaMQTTClient(TEST_BEMFA_UID, use_tls=False)
-    return BemfaDeviceSyncManager(TEST_BEMFA_UID, api, mqtt_client)
+    return BemfaDeviceSyncManager(hass, TEST_BEMFA_UID, api, mqtt_client)
 
 
 async def test_create_topic_v1_route(
@@ -405,20 +405,66 @@ async def test_cleanup_orphans_deletes_only_integration_topics(
 # ---------------------------------------------------------------------------
 
 
-def test_generate_nickname_strips_room_prefix() -> None:
-    """设备名含房间前缀时剥离，避免矛盾命名（书房儿童房主灯）。"""
+async def test_generate_nickname_strips_room_prefix(
+    hass: HomeAssistant,
+) -> None:
+    """首刷 fallback：设备名含房间前缀时剥离（device_entry 未建立）。"""
+    manager = _manager(hass)
     device = Device(
         appliance_id="dev_1",
         friendly_name="儿童房主灯",
         room_name="儿童房",
         appliance_types=["LIGHT"],
     )
-    nickname = BemfaDeviceSyncManager._generate_nickname(device, {"儿童房": "书房"})
+    nickname = manager._generate_nickname(
+        device, {"儿童房": "书房"}, {"儿童房", "书房"}
+    )
     assert nickname == "书房主灯"
 
 
-def test_generate_nickname_keeps_roomless_name() -> None:
-    """设备名不含房间 token 时原样拼接（电视墙射灯）。"""
+async def test_generate_nickname_strips_other_room_token(
+    hass: HomeAssistant,
+) -> None:
+    """首刷 fallback：设备名嵌着他人房间词时也剥离（主卫灯带@主卧 → 主卧灯带）。
+
+    回归用户报告的 BUG：设备在「主卧」房间却叫「主卫灯带」，
+    旧实现只认「主卧」做锚点，残留「主卫」，拼接出「主卧主卫灯带」。
+    传入小度侧全部房间名后，「主卫」也被识别为房间词并被剥掉。
+    """
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_band",
+        friendly_name="主卫灯带",
+        room_name="主卧",
+        appliance_types=["LIGHT"],
+    )
+    assert (
+        manager._generate_nickname(
+            device, {"主卧": "主卧"}, {"主卧", "主卫", "客厅", "餐厅"}
+        )
+        == "主卧灯带"
+    )
+
+    # 设备在「餐厅」却叫「客厅灯带」
+    device_living = Device(
+        appliance_id="dev_band2",
+        friendly_name="客厅灯带",
+        room_name="餐厅",
+        appliance_types=["LIGHT"],
+    )
+    assert (
+        manager._generate_nickname(
+            device_living, {"餐厅": "餐厅"}, {"主卧", "主卫", "客厅", "餐厅"}
+        )
+        == "餐厅灯带"
+    )
+
+
+async def test_generate_nickname_keeps_roomless_name(
+    hass: HomeAssistant,
+) -> None:
+    """首刷 fallback：设备名不含房间 token 时原样拼接（电视墙射灯）。"""
+    manager = _manager(hass)
     device = Device(
         appliance_id="dev_2",
         friendly_name="电视墙射灯",
@@ -426,9 +472,84 @@ def test_generate_nickname_keeps_roomless_name() -> None:
         appliance_types=["LIGHT"],
     )
     assert (
-        BemfaDeviceSyncManager._generate_nickname(device, {"客厅": "客厅"})
+        manager._generate_nickname(device, {"客厅": "客厅"}, {"客厅", "主卧"})
         == "客厅电视墙射灯"
     )
+
+
+async def test_generate_nickname_follows_ha_area_and_name(
+    hass: HomeAssistant,
+) -> None:
+    """device_entry 存在时，昵称跟随 HA 实际 area 和 name_by_user。
+
+    覆盖功能点 3：用户在「命名与分配」改了区域/名后，巴法云昵称应跟随。
+    device 名「主卧主灯」+ area「书房」+ name_by_user「书房主灯」时，
+    昵称 = area(书房) + strip_room(name_by_user=书房主灯) = 书房主灯
+    （name_by_user 含房间词「书房」，被 strip_room 剥掉，避免叠加）。
+    """
+    manager = _manager(hass)
+    register_xiaodu_device(
+        hass,
+        "dev_follow",
+        area_name="书房",
+        name_by_user="书房主灯",
+    )
+    device = Device(
+        appliance_id="dev_follow",
+        friendly_name="主卧主灯",
+        room_name="主卧",
+        appliance_types=["LIGHT"],
+    )
+    assert (
+        manager._generate_nickname(device, {"主卧": "主卧"}, {"主卧", "书房"})
+        == "书房主灯"
+    )
+
+
+async def test_generate_nickname_uses_device_name_without_name_by_user(
+    hass: HomeAssistant,
+) -> None:
+    """device_entry 无 name_by_user 时，回退到 device.name（集成设的剥离后名）。"""
+    manager = _manager(hass)
+    # 模拟实体建立：device_name 是 entity.py device_info.name 设的剥离后值
+    register_xiaodu_device(hass, "dev_noname", area_name="客厅", device_name="吊灯")
+    device = Device(
+        appliance_id="dev_noname",
+        friendly_name="客厅吊灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # area=客厅，name_by_user 空 → fallback device.name=吊灯（已剥离，二次剥离幂等）
+    assert manager._generate_nickname(device, {"客厅": "客厅"}, {"客厅"}) == "客厅吊灯"
+
+
+async def test_nickname_follows_ha_area_change(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """用户改 area 后，_sync_nicknames 检测不一致并 modifyName。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_area",
+        friendly_name="主灯",
+        room_name="儿童房",
+        appliance_types=["LIGHT"],
+    )
+    # 首刷：device_entry 未建立，昵称用 room_mapping（儿童房→书房）
+    await manager.sync_devices([device], {"儿童房": "书房"})
+    assert manager.device_mapping["dev_area"].bemfa_nickname == "书房主灯"
+    aioclient_mock.mock_calls.clear()
+
+    # 用户在 HA 给设备分配了区域「卧室」（实体已建立，device.name=主灯）
+    register_xiaodu_device(hass, "dev_area", area_name="卧室", device_name="主灯")
+    # 再次同步：device_entry 已建立，昵称应跟随 HA area
+    await manager.sync_devices([device], {"儿童房": "书房"})
+    calls = [c for c in aioclient_mock.mock_calls if "modifyName" in str(c[1])]
+    assert len(calls) == 1
+    assert calls[0][2]["name"] == "卧室主灯"
+    assert manager.device_mapping["dev_area"].bemfa_nickname == "卧室主灯"
 
 
 async def test_nickname_follows_mapping_change(
