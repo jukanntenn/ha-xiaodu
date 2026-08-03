@@ -2,11 +2,11 @@
   "hooks": {
     "PostToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "apply_patch",
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$(git rev-parse --show-toplevel)/.claude/hooks/post-edit-format.py\""
+            "command": "uv run \"$(git rev-parse --show-toplevel)/.codex/hooks/post_tool_use.py\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"$(git rev-parse --show-toplevel)/.claude/hooks/stop-lint.py\""
+            "command": "uv run \"$(git rev-parse --show-toplevel)/.codex/hooks/stop.py\""
           }
         ]
       }

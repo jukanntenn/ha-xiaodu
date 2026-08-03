@@ -71,7 +71,9 @@ allowed-confusables = ["（", "）", "，", "：", "；", "→"]
     "SLF001",  # 白盒检查内部状态是测试的合理用例
     "PLC0415", # 测试内函数级 import（避免 tests 包循环导入 / 配合 monkeypatch）
 ]
-".claude/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Codex 与 Claude 共用）
+".claude/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Claude Code）
+".codex/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Codex CLI）
+".zcode/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（ZCode）
 "scripts/**" = ["T201"]  # CLI 检查脚本需要 stdout/stderr 输出
 
 [tool.ruff.format]
