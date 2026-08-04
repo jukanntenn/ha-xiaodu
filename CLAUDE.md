@@ -66,13 +66,14 @@ prek update                          # 升级钩子版本（遵循 cooldown_days
 |---|---|---|
 | Claude Code | `.claude/settings.json` | PostToolUse（`Edit\|Write`）+ Stop，完整能力 |
 | Codex | `.codex/hooks.json` | 同上（Codex 官方标准位置；需在用户级 `~/.codex/config.toml` 的 `[projects]` 标记 `trusted` 并在 `/hooks` 里 review hooks） |
-| opencode | `.opencode/plugin/hooks.ts` | 仅 PostToolUse 静默格式化（opencode 的 hook 为旁路型，输出无法 block，Stop 检查不生效） |
+| opencode | `.opencode/plugin/hooks.ts` | PostToolUse 静默格式化 + `session.idle` 门控（ruff + basedpyright）；opencode 的 event hook 为旁路型，无法返回 `{"decision":"block"}`，改用 `client.session.prompt()` 注入合成消息逼 agent 继续（每轮至多一次，等价于其他平台的 Stop） |
 | ZCode | `.zcode/config.json` | PostToolUse + Stop（项目级 hooks） |
 | Trae | 无（复用 `.claude/settings.json`） | Trae 原生读取 Claude Code Hook 配置 |
 
 - 编辑后：被编辑的 Python 文件自动用 `ruff format` + `ruff check --fix` 处理（静默，永不阻断）。
 - 停止前：运行 `ruff check` + `basedpyright`；失败时输出 `{"decision": "block", "reason": ...}`——Claude Code / Codex / ZCode / Trae 四方原生一致的协议。**禁止输出 `continue: false`**（Codex 与 Trae 中其语义为"停止"且优先级更高，会反转意图）。
-- `basedpyright` 在停止钩子里以 `--baselinemode=discard` 运行——绝不写入基线。`stop_hook_active` 守卫防循环（Claude Code 与 Codex 的 Stop 输入字段）。
+- `basedpyright` 在停止钩子里以 `--baselinemode=lock` 运行——与 CI 同行为，错误数任意方向变化（上升或下降）都非零退出，绝不写入基线。`stop_hook_active` / `stopHookActive` 守卫防循环（Claude Code/Codex 与 ZCode 的 Stop 输入字段名不同）。
+- baseline 漂移的根治门控是 prek 的 `basedpyright-lock` 本地钩子（见 `prek.toml`），它在 commit 前 + CI 的 `prek run --all-files` 双侧以 lock 模式运行，强制 baseline 更新与代码改动同笔提交。停止钩子是编辑期的早期拦截；commit 期的最终拦截靠 prek。
 - 配置格式均与官方源码/文档对齐：openai/codex、anomalyco/opencode、claude-code-docs、TRAE 官方文档、zcode-hooks-poc。
 - **hook 脚本必须带 shebang（`#!/usr/bin/env python3`）**：CI 的 ruff `EXE002`（可执行文件缺 shebang）会拦截；本地 WSL 下该规则被 ruff 显式豁免，存在"本地绿 CI 红"盲区，以 CI 为准。
 

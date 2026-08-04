@@ -66,6 +66,17 @@ hooks = [
     { id = "ruff-pin-check", name = "ruff 双 pin 一致性（pyproject == prek.toml）", language = "system", entry = "uv run python scripts/check_ruff_pin.py", pass_filenames = false, files = "^(pyproject\\.toml|prek\\.toml)$" },
 ]
 
+# ── 类型基线漂移门控（basedpyright lock 模式，强制 baseline 与代码原子绑定）──
+# 与 CI typecheck.yml 同行为：错误数任意方向变化（上升或下降）都非零退出。
+# 改了 .py 导致类型错误增减 → 本钩子拦下 → 必须跑 `uv run basedpyright --writebaseline`
+# 把 baseline 更新与代码改动同笔提交，杜绝"代码已改、baseline 滞后"的漂移。
+# files 含 .py / .basedpyright/ / pyproject.toml 三类；纯文档/翻译改动不触发。
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "basedpyright-lock", name = "basedpyright (lock, baseline 漂移门控)", language = "system", entry = "uv run basedpyright --baselinemode=lock", pass_filenames = false, files = "^(custom_components/.*\\.py$|\\.basedpyright/|pyproject\\.toml)$" },
+]
+
 # ── hassfest（HA 集成结构校验：manifest/strings/translations/codeowners 等）──
 # 复用官方 ghcr.io/home-assistant/hassfest 镜像，与 CI validate.yml 同源、同规则，
 # 上游更新镜像即自动跟进，无规则漂移。wrapper 脚本只挂载 custom_components 子目录：
