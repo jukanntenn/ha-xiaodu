@@ -129,6 +129,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.runtime_data = coordinator
 
+    # 注册 hass.bus 事件监听，实现设备名/区域变更的实时同步到巴法云
+    # （30s 轮询作兜底）。卸载时自动注销。
+    if bemfa_sync_manager:
+        entry.async_on_unload(bemfa_sync_manager.async_start_listeners(coordinator))
+
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_update_options))

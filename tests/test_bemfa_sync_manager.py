@@ -80,6 +80,15 @@ def _manager(
     return BemfaDeviceSyncManager(hass, TEST_BEMFA_UID, api, mqtt_client)
 
 
+class _FakeCoordinator:
+    """仅暴露 room_mapping / room_tokens / devices 的事件监听器用桩。"""
+
+    def __init__(self, devices: dict[str, Device]) -> None:
+        self.devices = devices
+        self.room_mapping: dict[str, str] = {}
+        self.room_tokens: set[str] = set()
+
+
 async def test_create_topic_v1_route(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
@@ -417,7 +426,7 @@ async def test_generate_nickname_strips_room_prefix(
         appliance_types=["LIGHT"],
     )
     nickname = manager._generate_nickname(
-        device, {"儿童房": "书房"}, {"儿童房", "书房"}
+        device, {"儿童房": "书房"}, {"儿童房", "书房"}, appliance_id="dev_1"
     )
     assert nickname == "书房主灯"
 
@@ -440,7 +449,10 @@ async def test_generate_nickname_strips_other_room_token(
     )
     assert (
         manager._generate_nickname(
-            device, {"主卧": "主卧"}, {"主卧", "主卫", "客厅", "餐厅"}
+            device,
+            {"主卧": "主卧"},
+            {"主卧", "主卫", "客厅", "餐厅"},
+            appliance_id="dev_band",
         )
         == "主卧灯带"
     )
@@ -454,7 +466,10 @@ async def test_generate_nickname_strips_other_room_token(
     )
     assert (
         manager._generate_nickname(
-            device_living, {"餐厅": "餐厅"}, {"主卧", "主卫", "客厅", "餐厅"}
+            device_living,
+            {"餐厅": "餐厅"},
+            {"主卧", "主卫", "客厅", "餐厅"},
+            appliance_id="dev_band2",
         )
         == "餐厅灯带"
     )
@@ -472,7 +487,9 @@ async def test_generate_nickname_keeps_roomless_name(
         appliance_types=["LIGHT"],
     )
     assert (
-        manager._generate_nickname(device, {"客厅": "客厅"}, {"客厅", "主卧"})
+        manager._generate_nickname(
+            device, {"客厅": "客厅"}, {"客厅", "主卧"}, appliance_id="dev_2"
+        )
         == "客厅电视墙射灯"
     )
 
@@ -501,7 +518,9 @@ async def test_generate_nickname_follows_ha_area_and_name(
         appliance_types=["LIGHT"],
     )
     assert (
-        manager._generate_nickname(device, {"主卧": "主卧"}, {"主卧", "书房"})
+        manager._generate_nickname(
+            device, {"主卧": "主卧"}, {"主卧", "书房"}, appliance_id="dev_follow"
+        )
         == "书房主灯"
     )
 
@@ -520,7 +539,12 @@ async def test_generate_nickname_uses_device_name_without_name_by_user(
         appliance_types=["LIGHT"],
     )
     # area=客厅，name_by_user 空 → fallback device.name=吊灯（已剥离，二次剥离幂等）
-    assert manager._generate_nickname(device, {"客厅": "客厅"}, {"客厅"}) == "客厅吊灯"
+    assert (
+        manager._generate_nickname(
+            device, {"客厅": "客厅"}, {"客厅"}, appliance_id="dev_noname"
+        )
+        == "客厅吊灯"
+    )
 
 
 async def test_nickname_follows_ha_area_change(
@@ -590,6 +614,197 @@ async def test_nickname_unchanged_skips_modify_name(
     await manager.sync_devices([_device()], {"次卧": "次卧"})
     aioclient_mock.mock_calls.clear()
     await manager.sync_devices([_device()], {"次卧": "次卧"})
+    assert not any("modifyName" in str(c[1]) for c in aioclient_mock.mock_calls)
+
+
+# ---------------------------------------------------------------------------
+# 实时同步（hass.bus 事件监听器）
+# ---------------------------------------------------------------------------
+
+
+def _register_listener(
+    hass: HomeAssistant,
+    manager: BemfaDeviceSyncManager,
+    device: Device,
+) -> tuple[_FakeCoordinator, Any]:
+    """注册事件监听器并返回（桩 coordinator, 注销函数）。"""
+    coordinator = _FakeCoordinator({device.appliance_id: device})
+    coordinator.room_mapping = {device.room_name: device.room_name}
+    coordinator.room_tokens = {device.room_name}
+    unsub = manager.async_start_listeners(coordinator)
+    return coordinator, unsub
+
+
+async def test_listener_device_rename_syncs_nickname(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """用户在 HA 改设备名 → 事件监听器实时 modifyName。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_rename",
+        friendly_name="客厅吊灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # 先建立 device_entry（分配区域），再首刷建立映射
+    register_xiaodu_device(hass, "dev_rename", area_name="客厅", device_name="吊灯")
+    await manager.sync_devices([device], {"客厅": "客厅"})
+    _register_listener(hass, manager, device)
+    aioclient_mock.mock_calls.clear()
+
+    # 用户在 HA 给设备改名（单次 update，触发一次 EVENT_DEVICE_REGISTRY_UPDATED）
+    from homeassistant.helpers import device_registry as dr
+
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get_device(identifiers={("xiaodu", "dev_rename")})
+    assert device_entry is not None
+    registry.async_update_device(device_entry.id, name_by_user="新吊灯")
+    await hass.async_block_till_done()
+
+    calls = [c for c in aioclient_mock.mock_calls if "modifyName" in str(c[1])]
+    assert len(calls) == 1
+    assert calls[0][2]["name"] == "客厅新吊灯"
+
+
+async def test_listener_device_area_change_syncs_nickname_and_room(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """用户在 HA 换区域 → 事件监听器实时 modifyName + changeTopicRoom。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_area",
+        friendly_name="主灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # 先在「客厅」建立 device_entry + 映射，再监听
+    register_xiaodu_device(hass, "dev_area", area_name="客厅", device_name="主灯")
+    await manager.sync_devices([device], {"客厅": "客厅"})
+    _register_listener(hass, manager, device)
+    aioclient_mock.mock_calls.clear()
+
+    # 用户把设备从「客厅」改分配到「卧室」（单次 area_id 变更事件）
+    from homeassistant.helpers import area_registry as ar
+    from homeassistant.helpers import device_registry as dr
+
+    bedroom = ar.async_get(hass).async_get_or_create("卧室").id
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get_device(identifiers={("xiaodu", "dev_area")})
+    assert device_entry is not None
+    registry.async_update_device(device_entry.id, area_id=bedroom)
+    await hass.async_block_till_done()
+
+    nick_calls = [c for c in aioclient_mock.mock_calls if "modifyName" in str(c[1])]
+    assert len(nick_calls) == 1
+    assert nick_calls[0][2]["name"] == "卧室主灯"
+    room_calls = [
+        c for c in aioclient_mock.mock_calls if "changeTopicRoom" in str(c[1])
+    ]
+    assert len(room_calls) == 1
+    assert room_calls[0][2]["room"] == "卧室"
+
+
+async def test_listener_area_rename_syncs_affected_devices(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """区域改名 → 事件监听器同步所有指向该区域的设备。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_arearen",
+        friendly_name="吊灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # 先建立 device_entry（分配到「客厅」），再首刷建立映射
+    register_xiaodu_device(hass, "dev_arearen", area_name="客厅", device_name="吊灯")
+    await manager.sync_devices([device], {"客厅": "客厅"})
+    _register_listener(hass, manager, device)
+    aioclient_mock.mock_calls.clear()
+
+    # 区域「客厅」改名为「大客厅」（触发 EVENT_AREA_REGISTRY_UPDATED）
+    from homeassistant.helpers import area_registry as ar
+
+    area_reg = ar.async_get(hass)
+    for a in area_reg.async_list_areas():
+        if a.name == "客厅":
+            area_reg.async_update(a.id, name="大客厅")
+            break
+    await hass.async_block_till_done()
+
+    nick_calls = [c for c in aioclient_mock.mock_calls if "modifyName" in str(c[1])]
+    assert len(nick_calls) == 1
+    assert nick_calls[0][2]["name"] == "大客厅吊灯"
+
+
+async def test_listener_ignores_unrelated_device_changes(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """与昵称/区域无关的字段变更（如 model）不触发同步。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_model",
+        friendly_name="吊灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # 先建立 device_entry + 映射，再监听
+    register_xiaodu_device(hass, "dev_model", area_name="客厅", device_name="吊灯")
+    await manager.sync_devices([device], {"客厅": "客厅"})
+    _register_listener(hass, manager, device)
+    aioclient_mock.mock_calls.clear()
+
+    # 改 model（不在 name_by_user/name/area_id 监听范围内）
+    from homeassistant.helpers import device_registry as dr
+
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get_device(identifiers={("xiaodu", "dev_model")})
+    assert device_entry is not None
+    registry.async_update_device(device_entry.id, model="NewModel")
+    await hass.async_block_till_done()
+
+    assert not any(
+        "modifyName" in str(c[1]) or "changeTopicRoom" in str(c[1])
+        for c in aioclient_mock.mock_calls
+    )
+
+
+async def test_listener_unsub_stops_sync(
+    hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
+) -> None:
+    """注销监听器后，设备改名不再触发同步。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    manager = _manager(hass)
+    device = Device(
+        appliance_id="dev_unsub",
+        friendly_name="吊灯",
+        room_name="客厅",
+        appliance_types=["LIGHT"],
+    )
+    # 先建立 device_entry + 映射，再监听后立即注销
+    register_xiaodu_device(hass, "dev_unsub", area_name="客厅", device_name="吊灯")
+    await manager.sync_devices([device], {"客厅": "客厅"})
+    _coordinator, unsub = _register_listener(hass, manager, device)
+    unsub()
+    aioclient_mock.mock_calls.clear()
+
+    # 注销后再改名，不应触发同步
+    from homeassistant.helpers import device_registry as dr
+
+    registry = dr.async_get(hass)
+    device_entry = registry.async_get_device(identifiers={("xiaodu", "dev_unsub")})
+    assert device_entry is not None
+    registry.async_update_device(device_entry.id, name_by_user="改名后")
+    await hass.async_block_till_done()
+
     assert not any("modifyName" in str(c[1]) for c in aioclient_mock.mock_calls)
 
 

@@ -7,8 +7,9 @@ import hashlib
 import logging
 import time
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
+from homeassistant.core import CALLBACK_TYPE, Event, HomeAssistant, callback
 from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 
@@ -22,7 +23,6 @@ from .const import (
 from .protocol import encode_state
 
 if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
     from homeassistant.helpers.device_registry import DeviceEntry
 
     from ..api.xiaodu_types import Device
@@ -30,6 +30,28 @@ if TYPE_CHECKING:
     from .mqtt_client import BemfaMQTTClient
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class CoordinatorLike(Protocol):
+    """事件监听器所需的协调器接口（解耦，避免 bemfa → coordinator 反向依赖）。
+
+    ``XiaoduCoordinator`` 满足此协议；测试可提供仅暴露这三个属性的桩。
+    """
+
+    @property
+    def devices(self) -> dict[str, Device]:
+        """当前设备数据（appliance_id -> Device）。"""
+        ...
+
+    @property
+    def room_mapping(self) -> dict[str, str]:
+        """房间映射（{xiaodu_room: ha_area}）。"""
+        ...
+
+    @property
+    def room_tokens(self) -> set[str]:
+        """小度侧全部房间名（剥离锚点全集）。"""
+        ...
 
 
 @dataclass
@@ -116,6 +138,112 @@ class BemfaDeviceSyncManager:
         即使 MQTT 从未连接过也可以安全调用。
         """
         await asyncio.to_thread(self._mqtt_client.disconnect)
+
+    def async_start_listeners(self, coordinator: CoordinatorLike) -> CALLBACK_TYPE:
+        """注册 hass.bus 事件监听，实现设备名/区域变更的实时同步。
+
+        监听 device/area registry 的 update 事件，把用户在 HA 改的设备名
+        （name_by_user）、区域分配（area_id）、区域名变更即时同步到巴法云
+        （modifyName / changeTopicRoom），将原本最多 30s 的轮询延迟缩短到
+        近实时。30s 轮询作为兜底保留（监听器遗漏或重启窗口期由轮询补齐）。
+
+        Args:
+            coordinator: 数据协调器，提供 room_mapping / room_tokens（剥离锚点）。
+
+        Returns:
+            注销函数，调用后移除全部监听器（在集成卸载时通过
+            ``entry.async_on_unload`` 调用）。
+        """
+
+        @callback
+        def _async_device_registry_updated(event: Event) -> None:
+            """设备改名（name_by_user）/换区（area_id）→ 同步昵称与 room。"""
+            if event.data.get("action") != "update":
+                return
+            changes = event.data.get("changes")
+            # 只关心影响巴法云昵称/room 的字段（changes 是 old_values 字典）
+            if not isinstance(changes, dict) or not any(
+                key in changes for key in ("name_by_user", "name", "area_id")
+            ):
+                return
+            device_id = event.data.get("device_id")
+            if not isinstance(device_id, str):
+                return
+            appliance_id = self._appliance_id_for_device_id(device_id)
+            if appliance_id is None:
+                return
+            _ = self._hass.async_create_task(
+                self._refresh_device_metadata(coordinator, appliance_id)
+            )
+
+        @callback
+        def _async_area_registry_updated(event: Event) -> None:
+            """区域改名/删除 → 同步所有指向该区域的设备。"""
+            if event.data.get("action") not in ("update", "remove"):
+                return
+            area_id = event.data.get("area_id")
+            if not isinstance(area_id, str):
+                return
+            affected = [
+                aid
+                for aid, mapping in self._device_mapping.items()
+                if mapping.bemfa_topic and self._area_id_for_appliance(aid) == area_id
+            ]
+            for appliance_id in affected:
+                _ = self._hass.async_create_task(
+                    self._refresh_device_metadata(coordinator, appliance_id)
+                )
+
+        unsubs: list[CALLBACK_TYPE] = [
+            self._hass.bus.async_listen(
+                str(dr.EVENT_DEVICE_REGISTRY_UPDATED), _async_device_registry_updated
+            ),
+            self._hass.bus.async_listen(
+                str(ar.EVENT_AREA_REGISTRY_UPDATED), _async_area_registry_updated
+            ),
+        ]
+
+        def _unsub() -> None:
+            for unsub in unsubs:
+                unsub()
+
+        return _unsub
+
+    def _appliance_id_for_device_id(self, device_id: str) -> str | None:
+        """由 HA device_id 反查小度 appliance_id。
+
+        device identifiers 形如 ``{(DOMAIN, appliance_id)}``（见 entity.py）。
+        """
+        device_entry = dr.async_get(self._hass).async_get(device_id)
+        if device_entry is None:
+            return None
+        for domain, ident in device_entry.identifiers:
+            if domain == DOMAIN:
+                return ident
+        return None
+
+    def _area_id_for_appliance(self, appliance_id: str) -> str | None:
+        """由 appliance_id 取其 HA device 的 area_id。"""
+        device_entry = self._resolve_ha_device(appliance_id)
+        return device_entry.area_id if device_entry is not None else None
+
+    async def _refresh_device_metadata(
+        self,
+        coordinator: CoordinatorLike,
+        appliance_id: str,
+    ) -> None:
+        """事件触发的单设备元数据刷新（昵称 + room 幂等同步）。
+
+        device_entry 在事件场景下必然存在（事件即由其触发），故
+        ``_sync_device_metadata`` 走 device_entry 分支；传入 coordinator 的
+        room_mapping / room_tokens 仅用于设备名房间词剥离的锚点全集。
+        """
+        await self._sync_device_metadata(
+            coordinator.devices.get(appliance_id),
+            coordinator.room_mapping,
+            coordinator.room_tokens,
+            appliance_id=appliance_id,
+        )
 
     async def async_cleanup_all(self) -> None:
         """删除所有巴法云 topic 并断开连接。
@@ -230,25 +358,76 @@ class BemfaDeviceSyncManager:
         room_mapping: dict[str, str],
         room_tokens: set[str],
     ) -> None:
-        """同步期望昵称到巴法云（modifyName），仅在昵称变化时调用。"""
+        """同步期望昵称与 room 到巴法云（modifyName / changeTopicRoom）。
+
+        每次轮询都会遍历全部已映射设备，幂等比对：昵称或 room 与缓存
+        不一致时才发起 HTTP 调用。room 字段同样跟随 HA 区域变更（换区 /
+        改区域名后巴法云控制台的房间分类会更新）。
+        """
         for device in devices:
-            mapping = self._device_mapping.get(device.appliance_id)
-            if not mapping or not mapping.bemfa_topic:
-                continue
-            expected = self._generate_nickname(device, room_mapping, room_tokens)
-            if mapping.bemfa_nickname == expected:
-                continue
+            await self._sync_device_metadata(
+                device, room_mapping, room_tokens, appliance_id=device.appliance_id
+            )
+
+    async def _sync_device_metadata(
+        self,
+        device: Device | None,
+        room_mapping: dict[str, str],
+        room_tokens: set[str],
+        *,
+        appliance_id: str,
+    ) -> None:
+        """同步单个设备的昵称与 room 到巴法云（幂等比对）。
+
+        同时用于 30s 轮询（``_sync_nicknames``）与 hass.bus 事件监听器。
+        昵称/room 的期望值取自 HA device registry（用户在「命名与分配」
+        步骤或设备页的改动）；``device`` 为 None（事件监听场景，仅有
+        appliance_id）时回退到首刷 fallback 值。
+
+        Args:
+            device: 小度设备（轮询时传入）；事件监听场景可为 None。
+            room_mapping: 房间映射（首刷 fallback 用）。
+            room_tokens: 小度侧全部房间名，剥离锚点。
+            appliance_id: 小度 appliance ID（必传，用于定位映射）。
+        """
+        mapping = self._device_mapping.get(appliance_id)
+        if not mapping or not mapping.bemfa_topic:
+            return
+
+        expected_nickname = self._generate_nickname(
+            device, room_mapping, room_tokens, appliance_id=appliance_id
+        )
+        expected_room = self._resolve_room_for_topic(
+            device, room_mapping, appliance_id=appliance_id
+        )
+
+        # 昵称幂等同步
+        if mapping.bemfa_nickname != expected_nickname:
             try:
-                ok = await self._api_client.modify_name(mapping.bemfa_topic, expected)
+                ok = await self._api_client.modify_name(
+                    mapping.bemfa_topic, expected_nickname
+                )
             except Exception:
                 _LOGGER.warning(
-                    "Failed to update nickname for %s",
-                    device.appliance_id,
-                    exc_info=True,
+                    "Failed to update nickname for %s", appliance_id, exc_info=True
                 )
-                continue
-            if ok:
-                mapping.bemfa_nickname = expected
+            else:
+                if ok:
+                    mapping.bemfa_nickname = expected_nickname
+
+        # room 幂等同步（巴法云控制台的房间分类跟随 HA 区域）
+        if mapping.bemfa_room != expected_room:
+            try:
+                ok = await self._api_client.change_topic_room(
+                    [mapping.bemfa_topic], expected_room
+                )
+            except Exception:
+                _LOGGER.warning(
+                    "Failed to update room for %s", appliance_id, exc_info=True
+                )
+            else:
+                if ok:
+                    mapping.bemfa_room = expected_room
 
     async def _add_device(
         self,
@@ -272,14 +451,20 @@ class BemfaDeviceSyncManager:
             return
 
         topic = self._generate_topic(device.appliance_id, device_type)
-        mapped_room = self._resolve_room_for_topic(device, room_mapping)
-        nickname = self._generate_nickname(device, room_mapping, room_tokens)
+        mapped_room = self._resolve_room_for_topic(
+            device, room_mapping, appliance_id=device.appliance_id
+        )
+        nickname = self._generate_nickname(
+            device, room_mapping, room_tokens, appliance_id=device.appliance_id
+        )
 
         result = await self._api_client.create_topic(topic, nickname)
         created = result.success
         if created:
+            # room = HA 区域名（巴法云控制台按房间归类展示）；
+            # group 暂留空——其语义应为跨房间的逻辑分组（如「照明」），
+            # 而非区域名，后续功能增强时再启用，避免 room=group 的语义混乱。
             await self._api_client.change_topic_room([topic], mapped_room)
-            await self._api_client.change_topic_group([topic], mapped_room)
             self._mqtt_client.subscribe(topic)
 
         self._device_mapping[device.appliance_id] = DeviceMapping(
@@ -414,7 +599,7 @@ class BemfaDeviceSyncManager:
     def _resolve_ha_device_name(
         self,
         device_entry: DeviceEntry | None,
-        device: Device,
+        device: Device | None,
         room_tokens: set[str],
     ) -> str:
         """解析设备的实际显示名并剥离房间词。
@@ -428,7 +613,8 @@ class BemfaDeviceSyncManager:
 
         Args:
             device_entry: HA 设备条目（可能为 None）。
-            device: 小度设备（用于 fallback 到原始 friendly_name/room_name）。
+            device: 小度设备（用于 fallback 到原始 friendly_name/room_name；
+                device_entry 存在时仅用于取 room_name 做 strip_room 锚点）。
             room_tokens: 小度侧全部房间名，剥离锚点。
 
         Returns:
@@ -437,16 +623,18 @@ class BemfaDeviceSyncManager:
         if device_entry is not None:
             raw_name = device_entry.name_by_user or device_entry.name or ""
         else:
-            raw_name = device.friendly_name
-        room_name = device.room_name
+            raw_name = device.friendly_name if device is not None else ""
+        room_name = device.room_name if device is not None else ""
         mapped_room = self._resolve_ha_area_name(device_entry) or room_name
         return strip_room(raw_name, room_name, mapped_room, room_tokens)
 
     def _generate_nickname(
         self,
-        device: Device,
+        device: Device | None,
         room_mapping: dict[str, str],
         room_tokens: set[str],
+        *,
+        appliance_id: str,
     ) -> str:
         """为设备生成巴法云昵称。
 
@@ -457,20 +645,23 @@ class BemfaDeviceSyncManager:
         格式：区域名 + 剥离房间 token 后的设备名。
 
         Args:
-            device: 小度设备。
+            device: 小度设备（轮询场景传入，事件监听场景可为 None）。
             room_mapping: 房间映射（首刷 fallback 用）。
             room_tokens: 小度侧全部房间名，用于剥离设备名中嵌套的
                 他人房间词（如设备在「主卧」却叫「主卫灯带」）。
+            appliance_id: 小度 appliance ID（反查 device registry 用）。
 
         Returns:
             昵称字符串。
         """
-        device_entry = self._resolve_ha_device(device.appliance_id)
+        device_entry = self._resolve_ha_device(appliance_id)
         if device_entry is not None:
             area_name = self._resolve_ha_area_name(device_entry)
             name = self._resolve_ha_device_name(device_entry, device, room_tokens)
             return f"{area_name}{name}"
         # 首刷 fallback：device_entry 未建立，用 room_mapping 派生
+        if device is None:
+            return ""
         mapped_room = room_mapping.get(device.room_name, device.room_name)
         stripped = strip_room(
             device.friendly_name, device.room_name, mapped_room, room_tokens
@@ -479,8 +670,10 @@ class BemfaDeviceSyncManager:
 
     def _resolve_room_for_topic(
         self,
-        device: Device,
+        device: Device | None,
         room_mapping: dict[str, str],
+        *,
+        appliance_id: str,
     ) -> str:
         """解析巴法云 topic 的 room 字段值。
 
@@ -488,17 +681,20 @@ class BemfaDeviceSyncManager:
         时回退到 room_mapping（首次同步）。
 
         Args:
-            device: 小度设备。
+            device: 小度设备（轮询场景传入，事件监听场景可为 None）。
             room_mapping: 房间映射（首刷 fallback 用）。
+            appliance_id: 小度 appliance ID（反查 device registry 用）。
 
         Returns:
-            区域名（用于巴法云 room/group 字段）。
+            区域名（用于巴法云 room 字段）。
         """
-        device_entry = self._resolve_ha_device(device.appliance_id)
+        device_entry = self._resolve_ha_device(appliance_id)
         if device_entry is not None:
             area_name = self._resolve_ha_area_name(device_entry)
             if area_name:
                 return area_name
+        if device is None:
+            return ""
         return room_mapping.get(device.room_name, device.room_name)
 
     @staticmethod
