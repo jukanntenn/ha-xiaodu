@@ -56,7 +56,7 @@
             },
             "bemfa_v2": {
                 "title": "Bemfa Cloud - v2 API",
-                "description": "The v2 API requires identity verification on Bemfa Cloud. It is the recommended and only maintained path.\n\n1. Log in to the Bemfa Cloud console and complete identity verification\n2. Open the \"API Key\" page and copy your private key (UID), secretID and secretKey\n3. Fill in all three fields below (all marked required)",
+                "description": "The v2 API requires identity verification on Bemfa Cloud. It is the recommended and only maintained path.\n\n1. Log in to the Bemfa Cloud console and complete identity verification\n2. Open the \"API Key\" page and copy your private key (UID), secretID and secretKey\n3. Fill in all three fields below (all marked required)\n\n⚠️ After setup, you must also link your Bemfa Cloud account in the Mi Home app to enable voice control (see the previous step for the path).",
                 "data": {
                     "bemfa_uid": "Bemfa UID (Private Key)",
                     "bemfa_secret_id": "secretID",
@@ -70,7 +70,7 @@
             },
             "bemfa_v1": {
                 "title": "Bemfa Cloud - v1 Legacy",
-                "description": "The v1 API is a hidden legacy endpoint. It only needs your private key (UID) and does not require identity verification, but may be removed at any time.\n\nLog in to the Bemfa Cloud console and copy your private key (UID) below.",
+                "description": "The v1 API is a hidden legacy endpoint. It only needs your private key (UID) and does not require identity verification, but may be removed at any time.\n\nLog in to the Bemfa Cloud console and copy your private key (UID) below.\n\n⚠️ After setup, you must also link your Bemfa Cloud account in the Mi Home app to enable voice control (see the previous step for the path).",
                 "data": {
                     "bemfa_uid": "Bemfa UID (Private Key)"
                 },
