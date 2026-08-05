@@ -2238,6 +2238,22 @@
                 }
             },
             {
+                "code": "reportUnknownVariableType",
+                "range": {
+                    "startColumn": 4,
+                    "endColumn": 16,
+                    "lineCount": 1
+                }
+            },
+            {
+                "code": "reportUnknownVariableType",
+                "range": {
+                    "startColumn": 0,
+                    "endColumn": 22,
+                    "lineCount": 1
+                }
+            },
+            {
                 "code": "reportUnannotatedClassAttribute",
                 "range": {
                     "startColumn": 4,

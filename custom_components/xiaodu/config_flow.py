@@ -16,6 +16,9 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
 )
 
 from .api.exceptions import XiaoduApiError, XiaoduAuthError, XiaoduNetworkError
@@ -33,6 +36,7 @@ from .const import (
     ORIG_LABEL,
 )
 from .naming import strip_room
+from .notification import create_bemfa_binding_notification
 from .room_mapping import RoomMapper
 
 if TYPE_CHECKING:
@@ -42,6 +46,13 @@ _LOGGER = logging.getLogger(__name__)
 
 # 巴法云 UID：32 位十六进制（新版）或 45 位字母数字/下划线/连字符
 _UID_RE = re.compile(r"^[0-9a-fA-F]{32}$|^[A-Za-z0-9_-]{45}$")
+
+# 巴法云凭据（UID/secretID/secretKey）均为敏感字段，统一以密码框渲染
+# （前端圆点遮蔽 + 可见性切换）。不依赖 ha-form-string 按字段名子串匹配
+# （"secret"/"token"）的隐式推断，语义自洽且与 HA core 官方范式一致。
+_BEMFA_SECRET_SELECTOR = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD, autocomplete="off")
+)
 
 
 class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -274,9 +285,9 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="bemfa_v2",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_BEMFA_UID): str,
-                    vol.Required(CONF_BEMFA_SECRET_ID): str,
-                    vol.Required(CONF_BEMFA_SECRET_KEY): str,
+                    vol.Required(CONF_BEMFA_UID): _BEMFA_SECRET_SELECTOR,
+                    vol.Required(CONF_BEMFA_SECRET_ID): _BEMFA_SECRET_SELECTOR,
+                    vol.Required(CONF_BEMFA_SECRET_KEY): _BEMFA_SECRET_SELECTOR,
                 }
             ),
             errors=errors,
@@ -306,7 +317,9 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="bemfa_v1",
-            data_schema=vol.Schema({vol.Required(CONF_BEMFA_UID): str}),
+            data_schema=vol.Schema(
+                {vol.Required(CONF_BEMFA_UID): _BEMFA_SECRET_SELECTOR}
+            ),
             errors=errors,
         )
 
@@ -342,6 +355,10 @@ class XiaoduConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         }
         if bemfa_config:
             options["bemfa"] = bemfa_config
+            # 启用巴法云同步时，创建一次性的「去米家绑定」引导通知。
+            # persistent_notification 是纯内存的，用户 dismiss 或 HA 重启
+            # 后即消失，绝不持续打扰（仅本次配置完成时创建一次）。
+            create_bemfa_binding_notification(self.hass)
 
         return self.async_create_entry(
             title=f"Xiaodu: {self._house_name}",
@@ -531,15 +548,15 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(
                         CONF_BEMFA_UID, default=current_bemfa.get("uid", "")
-                    ): str,
+                    ): _BEMFA_SECRET_SELECTOR,
                     vol.Required(
                         CONF_BEMFA_SECRET_ID,
                         default=current_bemfa.get("secret_id", ""),
-                    ): str,
+                    ): _BEMFA_SECRET_SELECTOR,
                     vol.Required(
                         CONF_BEMFA_SECRET_KEY,
                         default=current_bemfa.get("secret_key", ""),
-                    ): str,
+                    ): _BEMFA_SECRET_SELECTOR,
                 }
             ),
             errors=errors,
@@ -578,7 +595,7 @@ class XiaoduOptionsFlow(config_entries.OptionsFlow):
                 {
                     vol.Required(
                         CONF_BEMFA_UID, default=current_bemfa.get("uid", "")
-                    ): str,
+                    ): _BEMFA_SECRET_SELECTOR
                 }
             ),
             errors=errors,
