@@ -179,3 +179,21 @@ async def test_on_message_undecodable_payload(
     assert received
     assert received[0][0] == "dev003"
     client.disconnect()
+
+
+def test_client_id_is_bemfa_uid_for_auth() -> None:
+    """client_id 必须等于巴法云 UID——它是 MQTT 主鉴权凭证。
+
+    巴法云官方 MQTT 文档：用户私钥（UID）直接作 client_id，username/
+    password 留空即通过鉴权。任何对 client_id 的改动（如追加实例段）都会
+    使 broker 判定 client_id 不匹配 → 回退到 username/password 验证 →
+    本集成不传这俩 → 连接被拒。故 client_id 不得注入任何额外信息；
+    多实例隔离完全由 topic 命名空间（实例段）在应用层承担。
+    """
+    client = BemfaMQTTClient(
+        "829af90951ca4fa2b5b92d10c9bdc189",
+        host="127.0.0.1",
+        port=1883,
+        use_tls=False,
+    )
+    assert client._bemfa_uid == "829af90951ca4fa2b5b92d10c9bdc189"

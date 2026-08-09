@@ -36,6 +36,7 @@ from tests.const import (
     TEST_BEMFA_SECRET_ID,
     TEST_BEMFA_SECRET_KEY,
     TEST_BEMFA_UID,
+    TEST_INSTANCE_ID,
 )
 
 if TYPE_CHECKING:
@@ -77,7 +78,9 @@ def _manager(
         secret_key=secret_key,
     )
     mqtt_client = BemfaMQTTClient(TEST_BEMFA_UID, use_tls=False)
-    return BemfaDeviceSyncManager(hass, TEST_BEMFA_UID, api, mqtt_client)
+    return BemfaDeviceSyncManager(
+        hass, TEST_BEMFA_UID, api, mqtt_client, TEST_INSTANCE_ID
+    )
 
 
 class _FakeCoordinator:
@@ -337,34 +340,79 @@ async def test_unsupported_devices_tracked(
 # ---------------------------------------------------------------------------
 
 
-def test_generate_topic_uses_prefix_and_hash() -> None:
-    """topic = xdu + md5(appliance_id)[:12] + 3 位类型后缀。"""
-    topic = BemfaDeviceSyncManager._generate_topic("appliance_test_light_001", "LIGHT")
-    assert topic.startswith(BEMFA_TOPIC_PREFIX)
+async def test_generate_topic_uses_prefix_instance_and_hash(
+    hass: HomeAssistant,
+) -> None:
+    """topic = xdu + instance_id[:8] + md5(appliance_id)[:12] + 3 位类型后缀。"""
+    manager = _manager(hass)
+    topic = manager._generate_topic("appliance_test_light_001", "LIGHT")
+    instance_segment = TEST_INSTANCE_ID[:8]
+    assert topic.startswith(f"{BEMFA_TOPIC_PREFIX}{instance_segment}")
     assert topic.endswith("002")
-    assert len(topic) == len(BEMFA_TOPIC_PREFIX) + 12 + 3
+    assert len(topic) == len(BEMFA_TOPIC_PREFIX) + 8 + 12 + 3
     # 确定性：相同输入产生相同 topic
-    assert (
-        BemfaDeviceSyncManager._generate_topic("appliance_test_light_001", "LIGHT")
-        == topic
+    assert manager._generate_topic("appliance_test_light_001", "LIGHT") == topic
+
+
+async def test_generate_topic_isolates_instances(hass: HomeAssistant) -> None:
+    """不同 HA 实例（不同 instance_id）对同一设备生成不同 topic。"""
+    session = async_get_clientsession(hass)
+    api = BemfaAPIClient(TEST_BEMFA_UID, session)
+    mqtt_a = BemfaMQTTClient(TEST_BEMFA_UID, use_tls=False)
+    mqtt_b = BemfaMQTTClient(TEST_BEMFA_UID, use_tls=False)
+    manager_a = BemfaDeviceSyncManager(
+        hass, TEST_BEMFA_UID, api, mqtt_a, TEST_INSTANCE_ID
     )
+    manager_b = BemfaDeviceSyncManager(
+        hass, TEST_BEMFA_UID, api, mqtt_b, "0123456789abcdef"
+    )
+    topic_a = manager_a._generate_topic("dev_same", "LIGHT")
+    topic_b = manager_b._generate_topic("dev_same", "LIGHT")
+    # 同一设备在两个实例下 topic 不同——实例隔离生效
+    assert topic_a != topic_b
+    # 但都带集成前缀
+    assert topic_a.startswith(BEMFA_TOPIC_PREFIX)
+    assert topic_b.startswith(BEMFA_TOPIC_PREFIX)
 
 
-def test_generate_topic_ignores_rename() -> None:
+async def test_generate_topic_ignores_rename(hass: HomeAssistant) -> None:
     """topic 与名字无关——改名/改昵称不影响稳定关联。"""
-    a = BemfaDeviceSyncManager._generate_topic("dev_a", "LIGHT")
-    b = BemfaDeviceSyncManager._generate_topic("dev_b", "LIGHT")
+    manager = _manager(hass)
+    a = manager._generate_topic("dev_a", "LIGHT")
+    b = manager._generate_topic("dev_b", "LIGHT")
     assert a != b
-    assert BemfaDeviceSyncManager._generate_topic("dev_a", "LIGHT") == a
+    assert manager._generate_topic("dev_a", "LIGHT") == a
 
 
 def test_is_integration_topic() -> None:
-    """前缀校验：只认本集成 topic。"""
+    """前缀校验：只认本集成 topic（不含实例维度）。"""
+    assert BemfaDeviceSyncManager.is_integration_topic(
+        f"{BEMFA_TOPIC_PREFIX}a1b2c3d44f8e2c1a9b7d002"
+    )
+    # 旧格式（无实例段）仍属于本集成
     assert BemfaDeviceSyncManager.is_integration_topic(
         f"{BEMFA_TOPIC_PREFIX}4f8e2c1a9b7d002"
     )
     assert not BemfaDeviceSyncManager.is_integration_topic("haha001")
     assert not BemfaDeviceSyncManager.is_integration_topic("ha4f8e2c1a9b7d002")
+
+
+async def test_is_owned_topic_distinguishes_instances(
+    hass: HomeAssistant,
+) -> None:
+    """is_owned_topic 按 xdu+实例段 双段前缀判断本实例归属。"""
+    manager = _manager(hass)
+    instance_segment = TEST_INSTANCE_ID[:8]
+    # 本实例创建的 topic → owned
+    assert manager.is_owned_topic(
+        f"{BEMFA_TOPIC_PREFIX}{instance_segment}4f8e2c1a9b7d002"
+    )
+    # 其他实例的 topic（不同实例段）→ 不 owned
+    assert not manager.is_owned_topic(f"{BEMFA_TOPIC_PREFIX}deadbeef4f8e2c1a9b7d002")
+    # 旧格式（无实例段）→ 不 owned（不属于任何新实例）
+    assert not manager.is_owned_topic(f"{BEMFA_TOPIC_PREFIX}4f8e2c1a9b7d002")
+    # 非集成 topic → 不 owned
+    assert not manager.is_owned_topic("haha001")
 
 
 async def test_remove_device_refuses_non_integration_topic(
@@ -384,11 +432,17 @@ async def test_remove_device_refuses_non_integration_topic(
     assert "dev_user" not in manager.device_mapping
 
 
-async def test_cleanup_orphans_deletes_only_integration_topics(
+async def test_cleanup_orphans_deletes_only_owned_topics(
     hass: HomeAssistant, aioclient_mock: AiohttpClientMocker
 ) -> None:
-    """孤儿检测：删除带前缀但不在映射中的 topic，用户自建 topic 保留。"""
-    orphan = f"{BEMFA_TOPIC_PREFIX}deadbeef1234002"
+    """孤儿检测：只删本实例创建且不在映射中的 topic。
+
+    其他 HA 实例的 topic（不同实例段）、用户自建 topic 均保留——这是
+    多实例隔离的清理边界。
+    """
+    instance_segment = TEST_INSTANCE_ID[:8]
+    orphan = f"{BEMFA_TOPIC_PREFIX}{instance_segment}deadbeef1234002"
+    other_instance_topic = f"{BEMFA_TOPIC_PREFIX}99999999aaaaaaaabbbb002"
     user_topic = "haha001"
     aioclient_mock.clear_requests()
     aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
@@ -398,13 +452,18 @@ async def test_cleanup_orphans_deletes_only_integration_topics(
         BEMFA_ALL_TOPIC_URL,
         json={
             "code": 0,
-            "data": [{"topic": orphan}, {"topic": user_topic}],
+            "data": [
+                {"topic": orphan},
+                {"topic": other_instance_topic},
+                {"topic": user_topic},
+            ],
         },
     )
     aioclient_mock.post(BEMFA_DELETE_TOPIC_URL, json={"code": 0})
     manager = _manager(hass)
     await manager.sync_devices([_device()], {})
     deleted = [c for c in aioclient_mock.mock_calls if "deleteTopic" in str(c[1])]
+    # 只删本实例的孤儿；其他实例 topic 与用户自建 topic 保留
     assert len(deleted) == 1
     assert deleted[0][2]["topic"] == orphan
 

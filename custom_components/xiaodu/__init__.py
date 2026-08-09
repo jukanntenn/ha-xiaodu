@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_validation import config_entry_only_config_schema
+from homeassistant.helpers.instance_id import async_get as async_get_instance_id
 
 from .api.xiaodu_client import HOST, XiaoduAPI
 from .bemfa import (
@@ -62,6 +63,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if bemfa_config.get("enabled"):
         bemfa_uid: str = cast("str", bemfa_config.get("uid", ""))
         if bemfa_uid:
+            # HA 安装实例的唯一标识：注入 topic 实例段，隔离同一巴法云账户下
+            # 的多个 HA 实例（各实例只操作自己创建的 topic）。MQTT client_id
+            # 必须保持为 bemfa_uid——它是巴法云的主鉴权凭证，不得改动。
+            instance_id = await async_get_instance_id(hass)
             secret_id = str(bemfa_config.get("secret_id", ""))
             secret_key = str(bemfa_config.get("secret_key", ""))
             bemfa_api = BemfaAPIClient(
@@ -116,7 +121,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
             bemfa_mqtt.set_on_message_callback(_mqtt_message_received)
             bemfa_sync_manager = BemfaDeviceSyncManager(
-                hass, bemfa_uid, bemfa_api, bemfa_mqtt
+                hass, bemfa_uid, bemfa_api, bemfa_mqtt, instance_id
             )
             if not await bemfa_mqtt.async_connect(timeout_seconds=5.0):
                 _LOGGER.warning(

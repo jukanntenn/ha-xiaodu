@@ -18,8 +18,11 @@ BEMFA_MODIFY_NAME_URL = "https://apis.bemfa.com/va/modifyName"
 BEMFA_ALL_TOPIC_URL = "http://apis.bemfa.com/vb/api/v2/allTopic"
 BEMFA_RETRY_INTERVAL_SECONDS = 300
 
-# topic 命名空间：前缀 + 稳定哈希 + 3 位类型后缀。
+# topic 命名空间：前缀 + 实例段 + 稳定哈希 + 3 位类型后缀。
 # 前缀标识集成归属，任何删除/操作前必须校验，绝不触碰用户自建 topic；
+# 实例段取 HA instance_id 前 8 位，隔离同一巴法云账户下的多个 HA 实例——
+# 各实例只操作自己创建的 topic，互不感知；
 # 哈希由 appliance_id 确定性生成，改名/改昵称不影响关联。
 BEMFA_TOPIC_PREFIX = "xdu"
+BEMFA_TOPIC_INSTANCE_LENGTH = 8
 BEMFA_TOPIC_HASH_LENGTH = 12

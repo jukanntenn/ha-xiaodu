@@ -18,6 +18,7 @@ from ..naming import strip_room
 from .const import (
     BEMFA_RETRY_INTERVAL_SECONDS,
     BEMFA_TOPIC_HASH_LENGTH,
+    BEMFA_TOPIC_INSTANCE_LENGTH,
     BEMFA_TOPIC_PREFIX,
 )
 from .protocol import encode_state
@@ -83,6 +84,7 @@ class BemfaDeviceSyncManager:
         bemfa_uid: str,
         api_client: BemfaAPIClient,
         mqtt_client: BemfaMQTTClient,
+        instance_id: str,
     ) -> None:
         """初始化同步管理器。
 
@@ -92,11 +94,15 @@ class BemfaDeviceSyncManager:
             bemfa_uid: 巴法云（Bemfa）的 UID。
             api_client: 巴法云 HTTP API 客户端。
             mqtt_client: 巴法云 MQTT 客户端。
+            instance_id: HA 安装实例的唯一标识（``instance_id.async_get``），
+                前 8 位注入 topic 实例段，隔离同一巴法云账户下的多个 HA
+                实例——各实例只操作自己创建的 topic。
         """
         self._hass = hass
         self._bemfa_uid = bemfa_uid
         self._api_client = api_client
         self._mqtt_client = mqtt_client
+        self._instance_segment: str = instance_id[:BEMFA_TOPIC_INSTANCE_LENGTH]
         self._device_mapping: dict[str, DeviceMapping] = {}
         self._unsupported_devices: dict[str, list[str]] = {}
 
@@ -325,10 +331,14 @@ class BemfaDeviceSyncManager:
         await self._sync_nicknames(devices, room_mapping, room_tokens)
 
     async def _cleanup_orphans(self) -> None:
-        """删除巴法云上带集成前缀但不在当前映射中的孤儿 topic。
+        """删除巴法云上由本实例创建但不在当前映射中的孤儿 topic。
 
         仅在首次同步（无映射）时调用，尽力而为：任何失败仅记录日志，
         绝不阻塞设备创建主流程。
+
+        按 ``is_owned_topic``（``xdu`` + 本实例 instance_id 前 8 位）判断
+        归属——只清理本实例的孤儿，绝不触碰同一巴法云账户下其他 HA
+        实例的 topic，这是多实例隔离的清理边界。
         """
         try:
             topics = await self._api_client.list_topics()
@@ -343,7 +353,7 @@ class BemfaDeviceSyncManager:
             if mapping.bemfa_topic
         }
         for topic in topics:
-            if self.is_integration_topic(topic) and topic not in managed:
+            if self.is_owned_topic(topic) and topic not in managed:
                 _LOGGER.warning("Deleting orphan Bemfa topic: %s", topic)
                 try:
                     _ = await self._api_client.delete_topic(topic)
@@ -536,16 +546,17 @@ class BemfaDeviceSyncManager:
             mapping.sync_status = "synced"
         return published
 
-    @staticmethod
-    def _generate_topic(appliance_id: str, device_type: str) -> str:
+    def _generate_topic(self, appliance_id: str, device_type: str) -> str:
         """根据 appliance ID 生成巴法云 topic。
 
-        格式：{前缀}{md5(appliance_id) 前 12 位}{3 位设备类型代码}。
+        格式：{前缀}{实例段}{md5(appliance_id) 前 12 位}{3 位设备类型代码}。
 
         规则：
             1. 前缀标识集成归属（删除/操作前据此过滤）
-            2. 哈希由 appliance_id 确定性生成——改名/改昵称不影响关联
-            3. 后缀用于巴法云设备类型识别（末尾 3 位）
+            2. 实例段取 HA instance_id 前 8 位，隔离同一巴法云账户下的
+               多个 HA 实例——各实例只操作自己创建的 topic
+            3. 哈希由 appliance_id 确定性生成——改名/改昵称不影响关联
+            4. 后缀用于巴法云设备类型识别（末尾 3 位）
 
         Args:
             appliance_id: 小度 appliance ID。
@@ -559,12 +570,26 @@ class BemfaDeviceSyncManager:
             appliance_id.encode("utf-8")
         ).hexdigest()[:BEMFA_TOPIC_HASH_LENGTH]
         suffix = DEVICE_TYPE_SUFFIX_MAP.get(device_type, "006")
-        return f"{BEMFA_TOPIC_PREFIX}{digest}{suffix}"
+        return f"{BEMFA_TOPIC_PREFIX}{self._instance_segment}{digest}{suffix}"
 
     @staticmethod
     def is_integration_topic(topic: str) -> bool:
-        """判断 topic 是否为本集成创建的（带集成前缀）。"""
+        """判断 topic 是否为本集成创建的（带集成前缀）。
+
+        仅按 ``xdu`` 前缀判断集成归属，不含实例维度——用于防御性
+        校验（绝不误删用户自建 topic）。实例级归属判断见
+        :meth:`is_owned_topic`。
+        """
         return topic.startswith(BEMFA_TOPIC_PREFIX)
+
+    def is_owned_topic(self, topic: str) -> bool:
+        """判断 topic 是否由**本 HA 实例**创建。
+
+        匹配 ``xdu`` + 本实例的 instance_id 前 8 位这一双段前缀。
+        孤儿清理据此只删本实例的孤儿，绝不触碰同一巴法云账户下
+        其他 HA 实例的 topic——这是多实例隔离的清理边界。
+        """
+        return topic.startswith(f"{BEMFA_TOPIC_PREFIX}{self._instance_segment}")
 
     def _resolve_ha_device(self, appliance_id: str) -> DeviceEntry | None:
         """通过 appliance_id 反查 HA device registry 里的设备条目。
