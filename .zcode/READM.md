@@ -1,13 +1,17 @@
 # ZCode Hooks
 
-Project-local hook scripts for the ZCode agent (same ruff pipeline as the
-Claude/Codex hooks — see `docs/agent-hooks.md`).
+Project-local hook scripts for the ZCode agent. Thin adapters over **prek**
+(the single source of truth for all quality gates — same as the
+Claude/Codex/opencode hooks and CI; see `prek.toml` and AGENTS.md):
 
-- `hooks/post_tool_use.py` — PostToolUse (`Edit|Write`): runs `ruff check --fix`
-  then `ruff format` on the edited `.py`/`.pyi` file. Never blocks.
-- `hooks/stop.py` — Stop: runs a repo-wide `ruff check --fix`; if unfixable lint
-  remains it prints `{"decision":"block","reason":"..."}` (once per turn, guarded
-  by the `stopHookActive` flag). ZCode caps Stop continuations at 3 natively.
+- `hooks/post_tool_use.py` — PostToolUse (`Edit|Write`): runs
+  `prek run --group format --files <path>` (ruff autofix/format + whitespace
+  hygiene). Never blocks; prek exit 0/1 are both tolerated.
+- `hooks/stop.py` — Stop: runs `prek run --group lint --all-files` (ruff,
+  codespell, basedpyright lock, import-linter, deptry, uv lock, version sync,
+  hassfest, ...). On failure prints `{"decision":"block","reason":"..."}`
+  (once per turn, guarded by the `stopHookActive` flag). ZCode caps Stop
+  continuations at 3 natively.
 
 ## Why there is no `.zcode/config.json` here
 

@@ -24,7 +24,6 @@ dev = [
     "basedpyright",
     "ty",
     "codespell>=2.4",
-    "tomli>=2.0; python_version < '3.11'",
     "amqtt>=0.11.4,<0.12",
     "import-linter>=2.13",
     "deptry>=0.25.1",
@@ -74,7 +73,7 @@ allowed-confusables = ["（", "）", "，", "：", "；", "→"]
 ".claude/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Claude Code）
 ".codex/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（Codex CLI）
 ".zcode/hooks/**" = ["SIM105", "S603", "S607", "T201", "PLW1510"]  # hook 脚本（ZCode）
-"scripts/**" = ["T201"]  # CLI 检查脚本需要 stdout/stderr 输出
+"scripts/**" = ["T201", "S603", "S607"]  # CLI 脚本需要 stdout 输出；hassfest.py 调 docker（受控输入）
 
 [tool.ruff.format]
 quote-style = "double"

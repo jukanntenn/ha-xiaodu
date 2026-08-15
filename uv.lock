@@ -6051,7 +6051,6 @@ dev = [
     { name = "pytest-mock", specifier = ">=3.0" },
     { name = "pytest-timeout", specifier = ">=2.0" },
     { name = "ruff", specifier = "==0.16.1" },
-    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0" },
     { name = "ty" },
 ]
 

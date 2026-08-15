@@ -1,105 +1,120 @@
+# prek 配置 —— 本仓库唯一质量门控真相源（本地 commit / pre-push 与 CI 共用，无平行定义）。
+#
+# 钩子按三个运行剖面打组（groups，供 `prek run --group` 选择）：
+#   format — 会修改文件的格式化 / autofix 钩子（AI 编辑后逐文件、commit、CI）
+#   lint   — 只读、离线、秒级检查（AI 停止前全仓、commit、CI）
+#   check  — 慢速验证（pre-push、CI tests）
+# 组只影响显式 `--group` 调用剖面；commit 与 `prek run --all-files` 仍按 stages 全量执行。
+# AI 工具（.claude/.codex/.zcode/.opencode）的 hooks 是对这些命令的薄封装，不含门控逻辑。
+#
+# 常用命令：
+#   prek install --hook-type pre-commit --hook-type pre-push --hook-type commit-msg
+#                                        # 安装 git 钩子（每个 clone 一次；prek 0.4.11 的
+#                                        # default_install_hook_types 对 TOML 配置不生效，需显式指定）
+#   prek run --all-files                  # 全量门控（与 CI lint job 完全一致；push 前必跑一次）
+#   prek run --group format --files <f>   # 只跑 format 组（与 AI 编辑后钩子一致）
+#   prek run --group lint --all-files     # 只跑 lint 组（与 AI 停止前钩子一致）
+#   prek run --stage pre-push --all-files # 只跑 pre-push 钩子（pytest；与 CI tests job 一致）
+#   prek update                           # 升级钩子版本（遵循 cooldown_days）
+
 [update]
 cooldown_days = 7
 freeze = true
 
-# ── 基础卫生（prek builtin，零网络零依赖，Rust 原生最快）──
+default_install_hook_types = ["pre-commit", "pre-push", "commit-msg"]
+
+# ── format 组：会改文件的钩子（AI 编辑后 + commit + CI）──
+# 生成物豁免（uv.lock / basedpyright 基线由工具生成，禁止被格式化钩子改写；时效性由
+# uv-lock 与 basedpyright-lock 两个只读闸门把关）。正则按钩子内联——prek 不支持配置级变量插值。
 [[repos]]
 repo = "builtin"
 hooks = [
-    { id = "trailing-whitespace" },
-    { id = "end-of-file-fixer" },
-    { id = "check-yaml" },
-    { id = "check-toml" },
-    { id = "check-json" },
-    { id = "mixed-line-ending", args = ["--fix=lf"] },
-    { id = "check-merge-conflict" },
-    { id = "check-added-large-files", args = ["--maxkb=2000"] },
-    { id = "detect-private-key" },
+    { id = "trailing-whitespace", exclude = "(^|/)uv\\.lock$|^\\.basedpyright/baseline\\.json$", groups = ["format"], stages = ["pre-commit"] },
+    { id = "end-of-file-fixer", exclude = "(^|/)uv\\.lock$|^\\.basedpyright/baseline\\.json$", groups = ["format"], stages = ["pre-commit"] },
+    { id = "mixed-line-ending", args = ["--fix=lf"], exclude = "(^|/)uv\\.lock$|^\\.basedpyright/baseline\\.json$", groups = ["format"], stages = ["pre-commit"] },
 ]
 
-# ── Python lint + format ──
+# ── 只读卫生检查（commit + CI；不进 AI Stop 剖面）──
 [[repos]]
-repo = "https://github.com/astral-sh/ruff-pre-commit"
-rev = "v0.16.1"
+repo = "builtin"
 hooks = [
-    { id = "ruff-check", args = ["--fix", "--exit-non-zero-on-fix"] },
-    { id = "ruff-format" },
+    { id = "check-yaml", stages = ["pre-commit"] },
+    { id = "check-toml", stages = ["pre-commit"] },
+    { id = "check-json", stages = ["pre-commit"] },
+    { id = "check-merge-conflict", stages = ["pre-commit"] },
+    { id = "check-added-large-files", args = ["--maxkb=2000"], stages = ["pre-commit"] },
+    { id = "detect-private-key", stages = ["pre-commit"] },
 ]
 
-# ── 拼写检查 ──
+# ── ruff（版本唯一真相源：pyproject 的 ruff pin，经 uv run 调用，无双 pin 漂移）──
 [[repos]]
-repo = "https://github.com/codespell-project/codespell"
-rev = "v2.4.1"
+repo = "local"
 hooks = [
-    { id = "codespell", additional_dependencies = ["tomli"], args = ["--toml", "pyproject.toml"] },
+    { id = "ruff-check-fix", name = "ruff check --fix（format）", language = "system", entry = "uv run ruff check --fix", files = "\\.py$", pass_filenames = true, groups = ["format"], stages = ["pre-commit"] },
+    { id = "ruff-format", name = "ruff format（format）", language = "system", entry = "uv run ruff format", files = "\\.py$", pass_filenames = true, groups = ["format"], stages = ["pre-commit"] },
+    { id = "ruff-check", name = "ruff check（lint，只读全量）", language = "system", entry = "uv run ruff check", files = "\\.py$|^pyproject\\.toml$", pass_filenames = false, groups = ["lint"], stages = ["pre-commit"] },
 ]
 
-# ── GitHub Actions workflow 校验 ──
+# ── 拼写检查（lint）──
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "codespell", name = "codespell（lint）", language = "system", entry = "uv run codespell --toml pyproject.toml", pass_filenames = true, groups = ["lint"], stages = ["pre-commit"] },
+]
+
+# ── GitHub Actions workflow 校验（运行期拉取 JSON schema，有网络依赖 → 不进离线的 Stop 剖面）──
 [[repos]]
 repo = "https://github.com/python-jsonschema/check-jsonschema"
 rev = "0.37.4"
 hooks = [
-    { id = "check-github-workflows", args = ["--verbose"] },
+    { id = "check-github-workflows", args = ["--verbose"], stages = ["pre-commit"] },
 ]
 
-# ── GitHub Actions 语法检查（含 shellcheck 集成）──
+# ── GitHub Actions 语法检查（含 shellcheck 集成；lint）──
 [[repos]]
 repo = "https://github.com/rhysd/actionlint"
 rev = "v1.7.12"
 hooks = [
-    { id = "actionlint", additional_dependencies = ["github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"] },
+    { id = "actionlint", additional_dependencies = ["github.com/wasilibs/go-shellcheck/cmd/shellcheck@v0.11.1"], groups = ["lint"], stages = ["pre-commit"] },
 ]
 
-# ── GitHub Actions 安全（供应链漏洞）──
+# ── GitHub Actions 安全（供应链漏洞；lint）──
 [[repos]]
 repo = "https://github.com/zizmorcore/zizmor-pre-commit"
 rev = "v1.26.1"
 hooks = [
-    { id = "zizmor" },
+    { id = "zizmor", groups = ["lint"], stages = ["pre-commit"] },
 ]
 
-# ── uv.lock 一致性（改了 pyproject 必须同步 lock）──
+# ── 仓库级只读闸门（lint）──
 [[repos]]
 repo = "local"
 hooks = [
-    { id = "uv-lock", name = "uv lock --check", language = "system", entry = "uv lock --check", pass_filenames = false, files = "^(pyproject\\.toml|uv\\.lock)$" },
-    { id = "ruff-pin-check", name = "ruff 双 pin 一致性（pyproject == prek.toml）", language = "system", entry = "uv run python scripts/check_ruff_pin.py", pass_filenames = false, files = "^(pyproject\\.toml|prek\\.toml)$" },
+    # uv.lock 一致性（改了 pyproject 必须同步 lock）
+    { id = "uv-lock", name = "uv lock --check", language = "system", entry = "uv lock --check", pass_filenames = false, files = "^(pyproject\\.toml|uv\\.lock)$", groups = ["lint"], stages = ["pre-commit"] },
+    # 类型基线漂移门控（lock 模式，与 CI 同行为：错误数任意方向变化都非零退出；
+    # 漂移时运行 `uv run basedpyright --writebaseline`，把 baseline 更新与代码改动同笔提交）
+    { id = "basedpyright-lock", name = "basedpyright（lock，baseline 漂移门控）", language = "system", entry = "uv run basedpyright --baselinemode=lock", pass_filenames = false, files = "^(custom_components/.*\\.py$|\\.basedpyright/|pyproject\\.toml)$", groups = ["lint"], stages = ["pre-commit"] },
+    # hassfest（HA 集成结构校验，官方镜像，与 CI validate.yml 同源；无 Docker 温和跳过）
+    { id = "hassfest", name = "hassfest（HA 集成结构校验，官方镜像）", language = "system", entry = "python3 scripts/hassfest.py", pass_filenames = false, files = "^custom_components/.*\\.(json|py)$", groups = ["lint"], stages = ["pre-commit"] },
+    # import 分层门控（import-linter，forbidden 契约见 pyproject [tool.importlinter]）
+    { id = "import-linter", name = "import-linter（分层/循环依赖门控）", language = "system", entry = "uv run lint-imports --no-cache", pass_filenames = false, files = "^custom_components/.*\\.py$", groups = ["lint"], stages = ["pre-commit"] },
+    # 依赖卫生（未用依赖 / 未声明依赖）
+    { id = "deptry", name = "deptry（依赖卫生）", language = "system", entry = "uv run deptry .", pass_filenames = false, files = "^(custom_components/|tests/|pyproject\\.toml|uv\\.lock)", groups = ["lint"], stages = ["pre-commit"] },
+    # CLAUDE.md / AGENTS.md 一致性（独立维护，强制同步）
+    { id = "agents-claude-sync", name = "CLAUDE.md == AGENTS.md", language = "system", entry = "diff -q CLAUDE.md AGENTS.md", pass_filenames = false, always_run = true, groups = ["lint"], stages = ["pre-commit"] },
 ]
 
-# ── 类型基线漂移门控（basedpyright lock 模式，强制 baseline 与代码原子绑定）──
-# 与 CI typecheck.yml 同行为：错误数任意方向变化（上升或下降）都非零退出。
-# 改了 .py 导致类型错误增减 → 本钩子拦下 → 必须跑 `uv run basedpyright --writebaseline`
-# 把 baseline 更新与代码改动同笔提交，杜绝"代码已改、baseline 滞后"的漂移。
-# files 含 .py / .basedpyright/ / pyproject.toml 三类；纯文档/翻译改动不触发。
+# ── check 组：慢速验证（pre-push + CI tests）──
 [[repos]]
 repo = "local"
 hooks = [
-    { id = "basedpyright-lock", name = "basedpyright (lock, baseline 漂移门控)", language = "system", entry = "uv run basedpyright --baselinemode=lock", pass_filenames = false, files = "^(custom_components/.*\\.py$|\\.basedpyright/|pyproject\\.toml)$" },
+    { id = "pytest", name = "pytest（覆盖率门控 ≥90%）", language = "system", entry = "uv run pytest --durations=10 --cov=custom_components.xiaodu --cov-report=term-missing --cov-report=xml --cov-fail-under=90 tests", pass_filenames = false, files = "\\.py$|^(pyproject\\.toml|uv\\.lock)$|^tests/", groups = ["check"], stages = ["pre-push"] },
 ]
 
-# ── hassfest（HA 集成结构校验：manifest/strings/translations/codeowners 等）──
-# 复用官方 ghcr.io/home-assistant/hassfest 镜像，与 CI validate.yml 同源、同规则，
-# 上游更新镜像即自动跟进，无规则漂移。wrapper 脚本只挂载 custom_components 子目录：
-# 镜像 entrypoint 会 find . -name manifest.json，若挂整个仓库会扫到 .venv 内的 core
-# 集成 manifest（无 codeowners 字段）而误报 KeyError；Docker -v 不解析相对路径，
-# 故脚本内用 $(pwd) 解析绝对路径。无 Docker 时温和跳过，依赖 CI 兜底。
+# ── commit-msg：Conventional Commits 格式 ──
 [[repos]]
 repo = "local"
 hooks = [
-    { id = "hassfest", name = "hassfest（HA 集成结构校验，官方镜像）", language = "system", entry = "scripts/hassfest.sh", pass_filenames = false, files = "^custom_components/.*\\.(json|py)$" },
-]
-
-# ── import 分层门控（import-linter，6 条 forbidden 契约）──
-[[repos]]
-repo = "local"
-hooks = [
-    { id = "import-linter", name = "import-linter（分层/循环依赖门控）", language = "system", entry = "uv run lint-imports --no-cache", pass_filenames = false, files = "^custom_components/.*\\.py$" },
-    { id = "deptry", name = "deptry（依赖卫生）", language = "system", entry = "uv run deptry .", pass_filenames = false, files = "^(custom_components/|tests/|pyproject\\.toml|uv\\.lock)" },
-]
-
-# ── CLAUDE.md / AGENTS.md 一致性（独立维护，强制同步）──
-[[repos]]
-repo = "local"
-hooks = [
-    { id = "agents-claude-sync", name = "CLAUDE.md == AGENTS.md", language = "system", entry = "diff -q CLAUDE.md AGENTS.md", pass_filenames = false, always_run = true },
+    { id = "conventional-commits", name = "Conventional Commits 格式", language = "system", entry = "python3 scripts/check_commit_msg.py", pass_filenames = true, stages = ["commit-msg"] },
 ]
