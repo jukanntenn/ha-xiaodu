@@ -24,6 +24,7 @@ dev = [
     "basedpyright",
     "ty",
     "codespell>=2.4",
+    "packaging>=24",
     "amqtt>=0.11.4,<0.12",
     "import-linter>=2.13",
     "deptry>=0.25.1",
@@ -208,6 +209,8 @@ forbidden_modules = ["custom_components.xiaodu.bemfa"]
 [tool.deptry]
 # HA 运行时提供这些包（不进依赖声明），属传递依赖属性质疑（DEP003）
 per_rule_ignores = { "DEP003" = ["homeassistant", "aiohttp", "voluptuous"] }
+# scripts/ 是开发工具链（跑在 uv dev 环境里），不参与集成运行时依赖卫生检查
+extend_exclude = ["^scripts/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -59,7 +59,13 @@ prek update                            # 升级钩子版本（遵循 cooldown_da
 ## 提交与 Pull Request
 
 - 必须使用 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`ci:`、`chore:`（另放行标准补充 `build`/`style`/`perf`/`revert`）。commit-msg 钩子（`scripts/check_commit_msg.py`）强制校验首行格式；git 自动生成的 Merge/Revert 提交放行。
-- Changelog 手写维护：改动在 `## [Unreleased]` 下累积用户级中文描述（不含技术细节）。发布时打 `vX.Y.Z` tag，Release workflow 会自动创建 GitHub Release（正文取自 CHANGELOG，rc/beta 等预发布版本自动标记为 prerelease）并附带 `xiaodu.zip` 资产。
+- Changelog 手写维护：改动在 `## [Unreleased]` 下累积用户级中文描述（不含技术细节）。
+- 发版流程（最低心智负担）：
+    1. `uv run python scripts/bump_version.py <X.Y.Z|rcN>` —— 一次同步三处版本（manifest 写 `v` 前缀完整 tag、pyproject 写 PEP 440、CHANGELOG 的 Unreleased 转正并补新空段）；
+    2. 提交后打 tag：`git tag v<X.Y.Z> && git push origin main v<X.Y.Z>`；
+    3. Release workflow 自动：先跑测试（check 组，不通过不发布）→ 创建 GitHub Release（正文取自 CHANGELOG 对应版本段落，rc/beta 自动标记 prerelease）并附带 `xiaodu.zip` 资产。
+- tag 规范 `vX.Y.Z` / `vX.Y.ZrcN`：`v` 前缀为 HA 社区惯例（powercalc、ha-xiaomi-home 同款），去掉 `v` 后为合法 PEP 440；manifest `version` 与 tag 完全一致（含 `v`），由 prek 的 `version-sync` 钩子 + `check_version_sync.py` 把关三处一致。
+- 不发布 PyPI：分发渠道为 HACS（GitHub Release 的 `xiaodu.zip`）。
 
 ## AI Agent 钩子
 

@@ -6,16 +6,39 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  test:
+    name: Tests (prek check group)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          # 发布类 workflow 不开 uv 缓存（zizmor cache-poisoning 审计要求）
+          enable-cache: false
+      - run: uv python install 3.13
+      - run: uv sync --group dev
+      - uses: j178/prek-action@5337cb91e0fa35a7ff31b9ca345126d8bbbcdf16 # v2
+        with:
+          cache: false
+          install-only: true
+      # 测试不通过不发布：与 CI tests.yml（latest）及本地 pre-push 同一条命令。
+      - run: prek run --group check --all-files
+
   release:
     name: Create release with zip asset
+    needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -41,11 +64,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.VERSION }}
         run: python3 scripts/extract_release_notes.py "$VERSION" > /tmp/release-notes.md
 
+      # 完整 tag（含 v 前缀）写入 manifest——powercalc / ha-xiaomi-home 等 HA 社区
+      # 集成惯例，与 HACS 的版本展示一致。发版前 bump_version.py 已同步仓库内
+      # manifest，此处 sed 是打 zip 时的安全网。
       - name: Set manifest version
-        env:
-          VERSION: ${{ steps.version.outputs.VERSION }}
         run: |
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" custom_components/xiaodu/manifest.json
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${GITHUB_REF_NAME}\"/" custom_components/xiaodu/manifest.json
 
       - name: Create zip
         run: |

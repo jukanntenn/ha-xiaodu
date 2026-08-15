@@ -10,5 +10,5 @@
     "issue_tracker": "https://github.com/jukanntenn/ha-xiaodu/issues",
     "loggers": ["custom_components.xiaodu"],
     "requirements": ["paho-mqtt>=2.0"],
-    "version": "0.1.0rc1"
+    "version": "v0.1.0rc1"
 }

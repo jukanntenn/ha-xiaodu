@@ -101,6 +101,9 @@ hooks = [
     { id = "import-linter", name = "import-linter（分层/循环依赖门控）", language = "system", entry = "uv run lint-imports --no-cache", pass_filenames = false, files = "^custom_components/.*\\.py$", groups = ["lint"], stages = ["pre-commit"] },
     # 依赖卫生（未用依赖 / 未声明依赖）
     { id = "deptry", name = "deptry（依赖卫生）", language = "system", entry = "uv run deptry .", pass_filenames = false, files = "^(custom_components/|tests/|pyproject\\.toml|uv\\.lock)", groups = ["lint"], stages = ["pre-commit"] },
+    # 版本一致性（manifest == pyproject == CHANGELOG 最新标题，忽略 v 前缀等价；
+    # 发版用 scripts/bump_version.py 一次同步三处）
+    { id = "version-sync", name = "版本一致性（manifest / pyproject / CHANGELOG）", language = "system", entry = "uv run python scripts/check_version_sync.py", pass_filenames = false, files = "^(custom_components/xiaodu/manifest\\.json|pyproject\\.toml|CHANGELOG\\.md)$", groups = ["lint"], stages = ["pre-commit"] },
     # CLAUDE.md / AGENTS.md 一致性（独立维护，强制同步）
     { id = "agents-claude-sync", name = "CLAUDE.md == AGENTS.md", language = "system", entry = "diff -q CLAUDE.md AGENTS.md", pass_filenames = false, always_run = true, groups = ["lint"], stages = ["pre-commit"] },
 ]
