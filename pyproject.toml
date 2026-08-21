@@ -20,7 +20,7 @@ dev = [
     "pytest-mock>=3.0",
     "pytest-timeout>=2.0",
     "pytest-homeassistant-custom-component",
-    "ruff==0.16.1",
+    "ruff==0.16.3",
     "basedpyright",
     "ty",
     "codespell>=2.4",
