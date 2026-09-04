@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import threading
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -45,6 +46,8 @@ from tests.const import (
     TEST_HOUSE_NAME,
     TEST_ROOM_NAME,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -234,6 +237,36 @@ def aioclient_mock_fixture(aioclient_mock: AiohttpClientMocker) -> None:
     register_bemfa_endpoints(aioclient_mock)
 
 
+BROKER_SHUTDOWN_TIMEOUT = 10.0
+
+
+async def shutdown_broker_gracefully(
+    broker: Broker, *, reclaim_port: bool = False
+) -> None:
+    """带看门狗地关闭 amqtt broker。
+
+    amqtt 的 shutdown 会逐会话等待 DISCONNECT 握手收尾（_stop_handler），
+    CI 负载下可能永远等不到，把整个测试拖到 pytest-timeout。到点放弃优雅
+    清理、直接丢弃实例；reclaim_port 用于 restart 场景——手动关掉监听
+    socket 以便新 broker 立即复用同一端口。
+    """
+    try:
+        await asyncio.wait_for(broker.shutdown(), timeout=BROKER_SHUTDOWN_TIMEOUT)
+        return
+    except TimeoutError:
+        _LOGGER.warning(
+            "broker.shutdown() 超时（%.0fs），放弃该实例的优雅清理",
+            BROKER_SHUTDOWN_TIMEOUT,
+        )
+    if reclaim_port:
+        for server in broker._servers.values():
+            try:
+                server.instance.close()
+                await asyncio.wait_for(server.instance.wait_closed(), timeout=5)
+            except (TimeoutError, AttributeError, OSError):
+                _LOGGER.warning("监听 socket 回收失败（可忽略）")
+
+
 class MqttBrokerHandle:
     """测试用 amqtt broker 句柄。"""
 
@@ -249,7 +282,7 @@ class MqttBrokerHandle:
 
     async def restart(self) -> None:
         """在同一端口重启 broker（验证客户端自动重连）。"""
-        await self._broker.shutdown()
+        await shutdown_broker_gracefully(self._broker, reclaim_port=True)
         self._broker = Broker(
             config={
                 "listeners": {
@@ -319,7 +352,7 @@ async def bemfa_mqtt_broker(
     handle = MqttBrokerHandle("127.0.0.1", port, broker)
     yield handle
     if not handle._broker.transitions.is_stopped():
-        await handle._broker.shutdown()
+        await shutdown_broker_gracefully(handle._broker)
 
 
 @pytest.fixture
