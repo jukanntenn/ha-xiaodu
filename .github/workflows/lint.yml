@@ -37,7 +37,7 @@ jobs:
       # 单一真相源：CI 的全部 format/lint 门控都在 prek.toml 中定义（ruff、codespell、
       # basedpyright lock、import-linter、deptry、hassfest、workflow 校验等），
       # 这里只负责装好环境后调 prek，与本地 `prek run --all-files` 完全一致。
-      - uses: j178/prek-action@5337cb91e0fa35a7ff31b9ca345126d8bbbcdf16 # v2
+      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
         with:
           cache: true
       - uses: pre-commit-ci/lite-action@5d6cc0eb514c891a40562a58a8e71576c5c7fb43 # v1.1.0
