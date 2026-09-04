@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """从 CHANGELOG.md 提取指定版本（Keep a Changelog 段落）作为 GitHub Release Notes。
 
 用法：extract_release_notes.py <version> [changelog 路径]

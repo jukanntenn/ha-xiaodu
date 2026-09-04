@@ -2,10 +2,11 @@
 """hassfest 本地校验 wrapper（prek hook 入口）。
 
 复用官方 ghcr.io/home-assistant/hassfest 镜像，与 CI validate.yml 同源、同规则，
-上游更新镜像即自动跟进，无规则漂移。镜像 entrypoint 会执行
-`find . -name manifest.json`，因此只能挂载 custom_components 子目录——若挂整个
-仓库，会扫到 .venv 内 HA core 自带集成的 manifest（无 codeowners 字段）而误报
-KeyError。无 Docker 时温和跳过，依赖 CI 兜底。
+上游更新镜像即自动跟进，无规则漂移。与官方 action 保持一致：挂载整个仓库到
+/github/workspace——镜像 entrypoint 只在 custom_components/<domain>/manifest.json
+与根级 manifest.json 两处发现集成，不会扫到 .venv 内 HA core 自带集成
+（2026-09 起的镜像；旧镜像全仓 `find . -name manifest.json`，故当时只能挂
+custom_components 子目录）。无 Docker 时温和跳过，依赖 CI 兜底。
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ def main() -> int:
             "run",
             "--rm",
             "-v",
-            f"{REPO_ROOT / 'custom_components'}:/github/workspace",
+            f"{REPO_ROOT}:/github/workspace",
             "ghcr.io/home-assistant/hassfest",
         ],
         check=False,
