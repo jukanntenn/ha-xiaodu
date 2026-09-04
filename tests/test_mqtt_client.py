@@ -121,7 +121,7 @@ async def test_subscribe_receives_downlink(
     client.subscribe("dev001")
     assert "dev001" in client.subscribed_topics
     bemfa_mqtt_probe.send("dev001", "on")
-    assert await asyncio.to_thread(got_message.wait, 3) is True
+    assert await asyncio.to_thread(got_message.wait, 10) is True
     assert received == [("dev001", "on")]
     client.disconnect()
 
@@ -149,7 +149,7 @@ async def test_resubscribe_after_broker_restart(
     await bemfa_mqtt_broker.restart()
     assert await client.async_connect(timeout_seconds=5.0) is True
     bemfa_mqtt_probe.send("dev002", "off")
-    assert await asyncio.to_thread(got_message.wait, 3) is True
+    assert await asyncio.to_thread(got_message.wait, 10) is True
     assert received == [("dev002", "off")]
     client.disconnect()
 
@@ -175,7 +175,7 @@ async def test_on_message_undecodable_payload(
     await client.async_connect(timeout_seconds=2.0)
     client.subscribe("dev003")
     bemfa_mqtt_probe.send_raw("dev003", b"\xff\xfe")
-    assert await asyncio.to_thread(got_message.wait, 3) is True
+    assert await asyncio.to_thread(got_message.wait, 10) is True
     assert received
     assert received[0][0] == "dev003"
     client.disconnect()

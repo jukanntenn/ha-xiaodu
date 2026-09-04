@@ -220,7 +220,7 @@ addopts = [
     "-v",
     "--tb=short",
     "--strict-markers",
-    "--timeout=9",
+    "--timeout=30",
 ]
 
 [tool.uv]

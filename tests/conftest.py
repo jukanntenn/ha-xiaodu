@@ -279,7 +279,7 @@ class MqttProbe:
         self._client.publish(topic, payload, qos=qos)
 
     async def wait_for(
-        self, predicate, timeout_seconds: float = 3.0
+        self, predicate, timeout_seconds: float = 10.0
     ) -> tuple[str, str]:
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_seconds
@@ -346,7 +346,11 @@ async def bemfa_mqtt_probe(
     client.on_message = _on_message
     client.connect_async(bemfa_mqtt_broker.host, bemfa_mqtt_broker.port, keepalive=60)
     client.loop_start()
-    await asyncio.to_thread(connected.wait, 5)
+    # 预算放宽到 10s：CI 洪峰（多 PR 并行测试）下 paho+amqtt 的 TCP/CONNECT
+    # 往返会偶发超过 5s；未连上就 publish 会被 paho 静默丢弃，表现为下游
+    # 收不到消息的"假失败"（见 test_mqtt_client 的时序抖动）。
+    if not await asyncio.to_thread(connected.wait, 10):
+        raise AssertionError("MQTT probe 未能在 10s 内连上本地 broker")
     probe = MqttProbe(client, received)
     yield probe
     # paho 的 disconnect()/loop_stop() 是同步阻塞调用。直接在 event loop 线程
