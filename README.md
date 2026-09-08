@@ -43,9 +43,9 @@
 2. 将 custom_components/xiaodu/ 目录完整复制到 Home Assistant 配置目录下的 custom_components/ 文件夹中（最终路径应为 config/custom_components/xiaodu/）
 3. 重启 Home Assistant
 
-### 开发版通道（可选）
+### 跟踪最新开发进度（可选）
 
-main 分支每次推送都会自动产出 `dev` 版构建。在 HACS 的 Xiaodu 条目中「重新下载」并勾选「显示预发布版本」，即可切换跟踪开发版——不保证稳定，仅供尝鲜与验证修复。
+想抢在预发布版之前体验最新修复，可在 HACS 的 Xiaodu 条目中选择「重新下载」，版本选择 **main** 分支——HACS 会改为按提交跟踪，main 每次推送后都会提示更新。不保证稳定，仅供尝鲜与验证修复。
 
 ## 配置
 
