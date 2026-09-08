@@ -58,6 +58,7 @@ prek update                            # 升级钩子版本（遵循 cooldown_da
 
 ## 提交与 Pull Request
 
+- 任何变更先开 issue（包括错字修正），PR 须以 `Fixes #NN` 关联；未关联 issue 的 PR 可能被关闭（与 CONTRIBUTING.md 的社区规则一致）。
 - 必须使用 Conventional Commits：`feat:`、`fix:`、`docs:`、`refactor:`、`test:`、`ci:`、`chore:`（另放行标准补充 `build`/`style`/`perf`/`revert`）。commit-msg 钩子（`scripts/check_commit_msg.py`）强制校验首行格式；git 自动生成的 Merge/Revert 提交放行。
 - Changelog 手写维护：改动在 `## [Unreleased]` 下累积用户级中文描述（不含技术细节）。
 - 发版流程（最低心智负担）：

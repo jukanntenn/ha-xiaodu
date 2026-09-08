@@ -1,22 +1,29 @@
-# ha-xiaodu
+# Xiaodu for Home Assistant
 
-Home Assistant 自定义集成，用于接入百度小度智能设备（含巴法云三方同步）。
+[![Tests](https://github.com/jukanntenn/ha-xiaodu/actions/workflows/tests.yml/badge.svg)](https://github.com/jukanntenn/ha-xiaodu/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+
+非官方 Home Assistant 自定义集成，把百度小度（Xiaodu）智能设备接入 Home Assistant：通过百度 BDUSS Cookie 拉取家庭与设备列表，无需抓包或改装设备。可选开启巴法云（Bemfa）同步，让天猫精灵、小爱同学等第三方语音平台联动控制小度设备。
+
+> **项目状态**：`v0.1.0rc1` 预发布（dogfooding 阶段）。核心功能已可用，配置格式与行为仍可能调整。
 
 ## 功能特性
 
-- 多平台支持：灯光（Light）、开关（Switch）、空调（Climate）、窗帘（Cover）、门锁（Lock）、按钮（Button）
-- 巴法云同步：可选将小度设备同步到巴法云，便于第三方平台（如天猫精灵、小爱同学）联动控制
-- 房间映射：自动建立小度房间到 Home Assistant 区域的映射，并可在选项中修改
-- Config Flow 配置流程：通过图形界面完成配置，无需手动编辑 YAML
-- 重新认证：Cookie 过期后可在集成中直接重新认证，无需删除重新添加
-- 诊断信息导出：支持下载诊断信息，便于问题排查
-- 国际化（i18n）：支持英文（en）与简体中文（zh-Hans）
+- 六类设备平台：灯光（Light）、开关/插座（Switch）、空调（Climate）、窗帘（Cover）、门锁（Lock）、晾衣架（Button）
+- 巴法云三方同步（可选）：将设备镜像到巴法云，接入天猫精灵、小爱同学等第三方语音平台
+- 房间映射：按名称相似度自动建立小度房间到 Home Assistant 区域的映射，可在选项中逐个调整
+- 图形化配置：全程 Config Flow，无需 YAML；Cookie 过期后可在集成卡片上一键重新认证
+- 状态同步：每 30 秒轮询设备状态；设备改名、区域调整经事件监听近实时同步到巴法云
+- 诊断信息导出：Cookie 与巴法云密钥自动脱敏，可安全地附到 issue 辅助排查
+- 中英文界面：支持 zh-Hans 与 en
 
 ## 环境要求
 
 - Home Assistant ≥ 2026.1.0
-- Python ≥ 3.13（由 HA 自动管理，无需单独安装）
-- 已安装 HACS（推荐）或手动安装能力
+- 已安装 HACS（推荐）或具备手动安装能力
+- 百度账号（用于获取 BDUSS Cookie）
+- 巴法云账号（可选）：v2 API 需完成实名认证，v1 旧版仅需私钥
 
 ## 安装
 
@@ -36,6 +43,10 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 2. 将 custom_components/xiaodu/ 目录完整复制到 Home Assistant 配置目录下的 custom_components/ 文件夹中（最终路径应为 config/custom_components/xiaodu/）
 3. 重启 Home Assistant
 
+### 开发版通道（可选）
+
+main 分支每次推送都会自动产出 `dev` 版构建。在 HACS 的 Xiaodu 条目中「重新下载」并勾选「显示预发布版本」，即可切换跟踪开发版——不保证稳定，仅供尝鲜与验证修复。
+
 ## 配置
 
 本集成通过 Config Flow 进行配置，无需 YAML。
@@ -43,16 +54,26 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 ### 配置步骤
 
 1. 进入「设置 → 设备与服务 → 添加集成」，搜索 Xiaodu
-2. 输入百度 Cookie：填入百度 BDUSS Cookie（有效期约 180 天）
+2. 输入百度 Cookie：填入百度 BDUSS Cookie（有效期约 180 天，获取方法见 FAQ）
 3. 选择家庭：从拉取到的家庭列表中选择要同步的家庭
-4. 选择设备：勾选需要同步到 Home Assistant 的设备
-5. 房间映射：确认小度房间到 Home Assistant 区域的映射关系
+4. 选择设备：勾选需要同步到 Home Assistant 的设备（默认全选）
+5. 房间映射：确认小度房间到 Home Assistant 区域的映射（自动生成，可逐个调整）
 6. 巴法云配置（可选）：选择认证方式——**v2 API（推荐，需实名认证）**、v1 旧版（仅私钥）、或跳过
-7. 配置完成后，Home Assistant 会自动弹出「命名和分配」（Name and assign）对话框，这是 HA 的标准流程，可在其中调整设备名称和分配区域，无需操作可直接关闭。设备默认名已自动剥离房间前缀（如「儿童房主灯」→「主灯」，区域自动关联到映射后的房间）
+7. 配置完成后，Home Assistant 会自动弹出「命名和分配」（Name and assign）对话框，这是 HA 的标准流程，可在其中调整设备名称和分配区域，无需操作可直接关闭。设备默认名已自动剥离房间前缀（如「儿童房主灯」→「主灯」），区域自动关联到映射后的房间
+
+若启用了巴法云同步，配置完成后还会收到一条引导通知：在米家 App 绑定巴法云账号后，即可用小爱同学等语音控制已同步的设备。通知可直接忽略，重启 Home Assistant 后不再出现。
 
 ### 重新认证
 
 当 Cookie 过期时，集成会出现认证失败提示。点击集成卡片上的「重新认证」，输入新的百度 Cookie 即可，无需删除集成重新配置。
+
+### 配置项
+
+集成卡片上的「配置」选项可随时修改：
+
+- 房间映射
+- 巴法云设置（更换凭据、v1/v2 切换、禁用同步）
+- 重新认证
 
 ## 支持的设备
 
@@ -66,6 +87,8 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 | Cover（窗帘） | CURTAIN | 窗帘 |
 | Lock（门锁） | DOOR_LOCK | 智能门锁 |
 | Button（按钮） | CLOTHES_RACK | 晾衣架 |
+
+未在表中列出的设备类型不会生成实体（可在诊断信息的 `unsupported_devices` 中查看），欢迎通过 issue 反馈。
 
 ## FAQ
 
@@ -86,18 +109,26 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 - 通过诊断信息查看 `bemfa` 部分的 `sync_status`/`sync_error` 字段确认具体失败原因
 - 巴法云同步为可选功能，不影响小度设备本身的控制
 
-### Q3.5：同步到巴法云的设备怎么识别？
+### Q4：同步到巴法云的设备怎么识别？
 
 集成创建的巴法云设备 topic 以 `xdu` 前缀开头（如 `xdu4f8e2c1a9b7d002`），由小度设备 ID 哈希生成——与设备名/昵称无关，改名不会影响关联。集成只操作带该前缀的设备，不会触碰你自己在巴法云创建的设备；删除集成时会自动清理。
 
-### Q4：设备没有被识别 / 没有发现？
+### Q5：设备没有被识别 / 没有发现？
 
 - 确认在「选择设备」步骤勾选了目标设备
 - 确认设备类型在支持列表中（见「支持的设备」）
 - 通过诊断信息导出查看设备原始数据
 - 若为新设备类型，可提交 Issue 反馈
 
-## 诊断与日志 / Diagnostics & Logging
+### Q6：状态多久同步一次？
+
+设备状态每 30 秒轮询一次；设备改名、区域调整通过事件监听近实时同步到巴法云。
+
+### Q7：集成会存储哪些敏感信息？
+
+百度 BDUSS Cookie 与巴法云 UID/密钥，按 Home Assistant 标准存放于配置目录 `.storage` 的配置条目中。诊断信息导出时这些字段会自动脱敏（显示为 `**REDACTED**`）。请像保管账号密码一样保管你的 Home Assistant 配置目录。
+
+## 诊断与日志
 
 提交 Issue 或排查问题时，请附上 debug 日志和诊断信息：
 
@@ -108,22 +139,25 @@ Home Assistant 自定义集成，用于接入百度小度智能设备（含巴�
 5. 点击三点菜单 → **下载诊断信息（Download diagnostics）**，下载诊断 JSON 文件
 6. 将上述两个文件附到 Issue 中
 
-> 诊断 JSON 已自动对 Cookie、巴法云 secretID/secretKey 等敏感字段脱敏（显示为 `**REDACTED**`），可放心附上。
+> 诊断 JSON 已自动对 Cookie、巴法云 secretID/secretKey 等敏感字段脱敏，可放心附上。
+
+## 社区与支持
+
+- 使用 / 配置 / 巴法云同步问题 → [Discussions 问答区](https://github.com/jukanntenn/ha-xiaodu/discussions)（请先搜索既有讨论）
+- 可复现 bug 与具体功能请求 → [Issues](https://github.com/jukanntenn/ha-xiaodu/issues/new/choose)（表单会引导填写环境信息）
+- 安全漏洞 → 私密报告（见[安全政策](.github/SECURITY.md)），绝不开公开 issue
+- Home Assistant 本身的问题 → [官方社区](https://community.home-assistant.io) / [中文社区](https://bbs.hassbian.com)
+
+支持是社区性质的 best-effort，没有商业支持或 SLA，完整的分流说明见 [SUPPORT.md](.github/SUPPORT.md)。
 
 ## 参与贡献
 
-欢迎通过 Pull Request 或 Issue 参与本项目：
+本项目由 jukanntenn 与贡献者以 best-effort 方式维护。欢迎参与——任何变更（包括错字修正）都请先开 issue：
 
-- 仓库地址：<https://github.com/jukanntenn/ha-xiaodu>
-- 问题反馈：<https://github.com/jukanntenn/ha-xiaodu/issues>
+- 贡献指南：[CONTRIBUTING.md](CONTRIBUTING.md)
+- 新手入口：[good first issue](https://github.com/jukanntenn/ha-xiaodu/labels/good%20first%20issue)
 
-提交 PR 前请确保：
-
-- 代码风格一致
-- 新功能附带必要说明
-- 不引入敏感信息（如 Cookie、密钥）
-
-## 许可证
+## License
 
 本项目基于 MIT License 开源，详见 LICENSE 文件。
 

@@ -1,49 +1,123 @@
-name: BUG提交
-description: 插件不可用 / 插件出现实体不可用 / 控制无效 / 实体缺少小度对应功能
+name: Bug 报告
+description: 报告一个可复现的故障——已有行为不符合预期
+labels: ["bug"]
 body:
-  - type: input
+  - type: markdown
+    attributes:
+      value: |
+        感谢花时间报告问题！提交前请先搜索既有 issue，避免重复。
+        如果还不确定是不是 bug（使用疑问、配置问题），请移步 [Discussions 问答区](https://github.com/jukanntenn/ha-xiaodu/discussions)。
+
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: 事前检查
+      options:
+        - label: 我已搜索过既有 issue，没有相同的 bug 报告
     validations:
       required: true
-    attributes:
-      label: Device model / 设备型号
-      placeholder: 没有填写无
-      description: |
-        > [⚙️ 小度网页版 > 有问题的设备 > 产品/公司/设备名](https://xiaodu.baidu.com/saiya/smarthome/index.html)
-
-  - type: input
-    attributes:
-      label: Component version / 插件版本
-      placeholder: 0.1.0
-      description: |
-        > [⚙️ Settings > System > Repairs > Three Dots in Upper Right > System information](https://my.home-assistant.io/redirect/system_health) > `custom_components.xiaodu`
-        > [⚙️ 配置 > 系统 > 修复 > 右上角三个点 > 系统信息](https://my.home-assistant.io/redirect/system_health) > `custom_components.xiaodu`
-
-  - type: input
-    attributes:
-      label: HA core version / HA版本
-      placeholder: 2026.x.x
-      description: |
-        > [⚙️ Settings > ℹ️️ About](https://my.home-assistant.io/redirect/info)
-        > [⚙️ 配置 > ℹ️️ 关于](https://my.home-assistant.io/redirect/info)
 
   - type: textarea
+    id: summary
     attributes:
-      label: The problem / 问题详情
-
-  - type: textarea
+      label: 概要
+      description: 一句话说清错误的结果。
+      placeholder: "如：灯光实体无法开启，日志报 xxx"
     validations:
       required: true
-    attributes:
-      label: Entity attributes / 实体属性
-      render: yaml
-      description: |
-        > [🔨 Developer tools > ℹ️ State](https://my.home-assistant.io/redirect/developer_states) > 🔍 Filter (`button.xxxx_info`)
-        > [🔨 开发者工具 > ℹ️ 状态](https://my.home-assistant.io/redirect/developer_states) > 🔍 筛选该设备下的info实体
-        > 如果没有实体，请填写`无实体`
 
   - type: textarea
+    id: reproduction
     attributes:
-      label: Home Assistant Logs / 系统日志
-      description: |
-        > [⚙️ Settings > System > ✍️ Logs](https://my.home-assistant.io/redirect/logs) > 🔍 Filter `custom_components.xiaodu`
-        > [⚙️ 配置 > 系统 > ✍️ 日志](https://my.home-assistant.io/redirect/logs) > 🔍 筛选 `custom_components.xiaodu`
+      label: 复现步骤
+      description: 精确的步骤，能让人照着做出来。
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 实际结果与期望结果
+    validations:
+      required: true
+
+  - type: dropdown
+    id: ha-installation
+    attributes:
+      label: Home Assistant 安装类型
+      options:
+        - Home Assistant OS
+        - Home Assistant Container
+        - Home Assistant Supervised
+        - Home Assistant Core
+    validations:
+      required: true
+
+  - type: input
+    id: ha-version
+    attributes:
+      label: Home Assistant 版本
+      description: 设置 → 关于（[直达链接](https://my.home-assistant.io/redirect/info)）
+      placeholder: "2026.1.0"
+    validations:
+      required: true
+
+  - type: input
+    id: integration-version
+    attributes:
+      label: 集成版本
+      description: 设置 → 系统 → 修复 → 右上角三点 → 系统信息（[直达链接](https://my.home-assistant.io/redirect/system_health)），或看 HACS 中 Xiaodu 的版本
+      placeholder: "v0.1.0rc1 或 dev"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device-types
+    attributes:
+      label: 涉及的设备类型
+      description: 可多选；如不确定，可在[小度网页版](https://xiaodu.baidu.com/saiya/smarthome/index.html)查看设备的产品类型
+      multiple: true
+      options:
+        - 灯光（LIGHT）
+        - 插座（SOCKET）
+        - 开关 / 取暖器 / 新风 / 开窗器（SWITCH 等）
+        - 空调（AIR_CONDITION）
+        - 窗帘（CURTAIN）
+        - 门锁（DOOR_LOCK）
+        - 晾衣架（CLOTHES_RACK）
+        - 巴法云同步（不针对单一设备）
+        - 其他 / 不确定
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: bemfa-related
+    attributes:
+      label: 巴法云同步
+      options:
+        - label: 问题与巴法云同步相关（同步失败 / 第三方平台控制异常）
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 诊断信息
+      description: 集成卡片右上角三点 → 下载诊断信息，把 JSON 文件**拖入此处**，不要复制粘贴内容（敏感字段已自动脱敏）
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      render: shell
+      description: 设置 → 系统 → 日志（[直达链接](https://my.home-assistant.io/redirect/logs)）筛选 custom_components.xiaodu；建议先在集成菜单启用调试日志并复现一次
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: 行为准则
+      options:
+        - label: 我同意遵守本项目的[行为准则](https://github.com/jukanntenn/ha-xiaodu/blob/main/.github/CODE_OF_CONDUCT.md)
+    validations:
+      required: true

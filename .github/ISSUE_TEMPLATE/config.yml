@@ -1,5 +1,11 @@
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
-  - name: 微信交流群
-    url: https://mjj.today/i/9M0ZXI
-    about: 扫描二维码进群
+  - name: 提问与使用求助
+    url: https://github.com/jukanntenn/ha-xiaodu/discussions/new?category=q-a
+    about: 使用、配置与巴法云同步问题请到 Discussions 的问答区（先搜索既有讨论）。
+  - name: 安全漏洞
+    url: https://github.com/jukanntenn/ha-xiaodu/security
+    about: 请勿公开报告安全问题——使用私密漏洞报告。
+  - name: Home Assistant 本身的问题
+    url: https://www.home-assistant.io/help
+    about: HA 安装、配置或其他集成的问题请到官方支持渠道（中文社区 bbs.hassbian.com）。

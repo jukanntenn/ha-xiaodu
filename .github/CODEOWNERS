@@ -1,0 +1,14 @@
+# CODEOWNERS — 审查路由
+# 当前单人维护：所有路径路由到 @jukanntenn。
+# 未来有 owner 加入时，从下面的子树地图拆行：
+#   /custom_components/xiaodu/api/     小度云 API 客户端（逆向接口契约）
+#   /custom_components/xiaodu/bemfa/   巴法云 MQTT 同步
+#   /custom_components/xiaodu/*.py     六个 HA 平台 + 配置流/协调器/实体
+#   /tests/                            测试套件（fixtures / test_e2e）
+#   /scripts/ + 根 *.md + .github/     工具链、门禁与社区文件
+#
+# 契约注记：api/（小度云端点与类型）与 bemfa/protocol.py（巴法云上下行
+# 命令协议）是行为契约所在地——即使 /custom_components/ 将来有了 owner，
+# 这两处仍应保持维护者所有权。
+
+*  @jukanntenn
