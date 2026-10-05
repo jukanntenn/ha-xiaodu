@@ -3,5 +3,5 @@
 # languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   hdsh pairing record .agents/rfcs/proposed/bug-fix/2026-10-05-bemfa-state-reconciliation.md
-2026-10-05-bemfa-state-reconciliation.md: 0e54213ed91d7827d18435dfb2ee663c4926a4dd
-2026-10-05-bemfa-state-reconciliation.zh.md: f1624ee3b738021ae5dd6ecb97fd4243b1424334
+2026-10-05-bemfa-state-reconciliation.md: ca158d45a78856a324b6b5c82d559bd51fe70cb0
+2026-10-05-bemfa-state-reconciliation.zh.md: 5859256ef5ef57c3d807a8fe610a549dd05022c7
