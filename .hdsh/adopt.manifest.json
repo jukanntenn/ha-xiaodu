@@ -40,7 +40,6 @@
     ".github/pull_request_template.md": "577bf689d244434b1c04a0bc9b57d4b229444bddcfe3679b954ea10079e70a22",
     ".github/workflows/issue-lifecycle.yml": "e413f2c54cf3831b7ff6a3277f59303d77a825a97476d9b946ea26405c329fe4",
     ".github/workflows/issue-policy.yml": "efe015dc3e29ddf8bc3a14676456f777fcb59f5744e8e8af42564da9f0b7edf7",
-    "docs/AGENTS.md": "f998187db269765d2cf6811740f2e004d72d23b9f5ab54d42c71f64b7fd9af0c",
     "docs/cookbook/responding-to-pr-review-on-a-stack.md": "7f32f4e4362da0c18d737bbe9aae22e60c7a6222999894f2ea18e11c5a45a9b8",
     "docs/cookbook/responding-to-pr-review-on-a-stack.zh.md": "70f3185e17f9ba21a4440c80c5ca8a6d6e1f9eb03d312e6ba7a4162c56421127",
     "docs/i18n/README.md": "954622a0c7df7a241681defd2a2e1f64dcfbc4644d7769909e7e6e3813452be7",
@@ -50,14 +49,10 @@
     "docs/i18n/translation-rules.md": "eac627d8f40495c74faf15d5bcabdadc7ed547ff180945ef18bf4467f6950381",
     "docs/i18n/translation-rules.zh.md": "e7c575cc2bfb47ae1c141a6c27771ea52bc20bc38efcc2c3706620c1be808252"
   },
-  "editable": [
-    "docs/architecture.md",
-    "docs/architecture.zh.md",
-    "docs/development.md",
-    "docs/development.zh.md"
-  ],
+  "editable": [],
   "pendingMerges": [
-    "AGENTS.md"
+    "AGENTS.md",
+    "docs/AGENTS.md"
   ],
   "consumerConfig": [
     ".github/issue-management/config.json",
@@ -70,7 +65,7 @@
     ".agents/skills/pushing/SKILL.md",
     ".agents/skills/reviewing/SKILL.md"
   ],
-  "projectAnchor": 1,
+  "projectAnchor": 5,
   "slotGuidance": {
     ".agents/skills/archiving-rfcs/SKILL.md": {
       "archive-tests": "7e5b7c9a635c7bae11d9b4478457e62610aed660b2b4b0b9fd68b3640fe94ae3"
