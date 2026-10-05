@@ -98,10 +98,6 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
         if self.bemfa_sync_manager:
             await self._handle_bemfa_sync(devices)
 
-        # 将已存在设备的状态变更发布到 Bemfa
-        if self.bemfa_sync_manager and self.data:
-            await self._publish_state_changes(new_data)
-
         # 处理被锁定（locked）的设备——保留其本地状态
         current_time = time.time()
         self._locked_devices = {
@@ -117,6 +113,11 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
                     if old_device:
                         new_data[device_id] = old_device
 
+        # 巴法云对账：以最终数据（含锁改写）幂等发布——首轮成功轮询
+        # 天然全量补报，未变化轮次零网络开销
+        if self.bemfa_sync_manager:
+            await self._reconcile_bemfa_states(new_data)
+
         return new_data
 
     async def _handle_bemfa_sync(self, devices: list[Device]) -> None:
@@ -129,19 +130,25 @@ class XiaoduCoordinator(DataUpdateCoordinator[dict[str, Device]]):
         except Exception:
             _LOGGER.exception("Failed to sync devices with Bemfa")
 
-    async def _publish_state_changes(self, new_data: dict[str, Device]) -> None:
-        """将已存在设备的状态变更发布到 Bemfa（巴法云）。"""
-        if not self.bemfa_sync_manager or not self.data:
+    async def _reconcile_bemfa_states(self, new_data: dict[str, Device]) -> None:
+        """将最终数据幂等对账发布到 Bemfa（巴法云）。
+
+        以 sync_manager 记录的最后成功发布 payload 为基准（见
+        ``BemfaDeviceSyncManager.update_device_state``）：未变零网络开销，
+        变化（或无记录/上次发布失败）才发布。重启后的首轮成功轮询天然
+        全量补报，停机、轮询失败窗口与 MQTT 断连丢失的状态由此自愈。
+        发布基准是锁改写后的最终数据——巴法云精确镜像 HA 实体展示值，
+        且不会用锁窗口内的过期云端值覆盖刚发布的乐观 payload。
+        """
+        if not self.bemfa_sync_manager:
             return
-        for device_id, new_device in new_data.items():
-            old_device = self.data.get(device_id)
-            if old_device and old_device.state_setting != new_device.state_setting:
-                try:
-                    _ = await self.bemfa_sync_manager.update_device_state(
-                        device_id, new_device.state_setting
-                    )
-                except Exception:  # noqa: BLE001 - Bemfa 发布失败仅记日志，不阻断控制流程
-                    _LOGGER.debug("Failed to publish state change for %s", device_id)
+        for appliance_id, device in new_data.items():
+            try:
+                _ = await self.bemfa_sync_manager.update_device_state(
+                    appliance_id, device.state_setting
+                )
+            except Exception:  # noqa: BLE001 - Bemfa 发布失败仅记日志，不阻断轮询
+                _LOGGER.debug("Failed to reconcile state to Bemfa for %s", appliance_id)
 
     async def control_device(
         self,
