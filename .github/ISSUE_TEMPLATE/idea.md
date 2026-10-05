@@ -1,19 +1,19 @@
 ---
-name: 想法（维护者侧）
-about: 尚未落定、仍有可执行潜力的想法——社区想法请发 Discussions
+name: Idea
+about: Record an uncommitted idea that still has actionable potential
 title: ''
-labels: ''
 assignees: ''
+labels: type/idea
 ---
 
-<!-- 标题用一句中文动作或结果；正文预算 50 行以内。 -->
-一句话描述价值假设。
+<!-- Title states an English action or outcome; exposed body stays within 50 units. -->
+One sentence describing the value hypothesis.
 
 <details>
-<summary>价值与细节</summary>
+<summary>Value and details</summary>
 
-- 价值假设：
-- 待验证：
-- 可能的后续工作：
+- Value hypothesis:
+- Needs verification:
+- Possible follow-up work:
 
 </details>

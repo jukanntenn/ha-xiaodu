@@ -1,0 +1,21 @@
+{
+  "owner": "jukanntenn",
+  "accountType": "user",
+  "repository": "ha-xiaodu",
+  "projectNumber": 5,
+  "projectTitle": "ha-xiaodu",
+  "lifecycleActor": "jukanntenn",
+  "priorityField": "Priority",
+  "startDateField": "Start date",
+  "projectTimeZone": "Asia/Shanghai",
+  "allowUnassignedOwner": false,
+  "statuses": [
+    "Inbox",
+    "Backlog",
+    "Ready",
+    "In progress",
+    "In review",
+    "Done",
+    "No action"
+  ]
+}

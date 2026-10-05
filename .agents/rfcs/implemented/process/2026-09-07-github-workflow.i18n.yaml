@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/implemented/process/2026-09-07-github-workflow.md
+2026-09-07-github-workflow.md: eb2f102b279080bb853fee8870cb33c7979c691a
+2026-09-07-github-workflow.zh.md: 39b213acc5c75238f5eb25722803d0435bb22a6f

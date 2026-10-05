@@ -1,19 +1,19 @@
 ---
-name: 任务（维护者侧）
-about: 既非功能建议也非 bug 的明确工作
+name: Task
+about: Clear-cut work that is neither a Feature nor a Bug
 title: ''
-labels: ''
 assignees: ''
+labels: type/task
 ---
 
-<!-- 标题用一句中文动作或结果；正文预算 50 行以内。 -->
-一句话描述要完成的工作。
+<!-- Title states an English action or outcome; exposed body stays within 50 units. -->
+One sentence describing the work to complete.
 
 <details>
-<summary>验收与细节</summary>
+<summary>Acceptance and details</summary>
 
-- 验收标准：
-- 交付物：
-- 测试证据：
+- Acceptance criteria:
+- Deliverables:
+- Test evidence:
 
 </details>

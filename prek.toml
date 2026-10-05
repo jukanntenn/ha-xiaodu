@@ -63,9 +63,10 @@ hooks = [
 ]
 
 # ── GitHub Actions workflow 校验（运行期拉取 JSON schema，有网络依赖 → 不进离线的 Stop 剖面）──
+# 0.38.2 起 builtin schema 收录 issues 的 field_added/field_removed 事件类型（hdsh issue-lifecycle 用到）。
 [[repos]]
 repo = "https://github.com/python-jsonschema/check-jsonschema"
-rev = "0.37.4"
+rev = "0.38.2"
 hooks = [
     { id = "check-github-workflows", args = ["--verbose"], stages = ["pre-commit"] },
 ]
@@ -121,3 +122,17 @@ repo = "local"
 hooks = [
     { id = "conventional-commits", name = "Conventional Commits 格式", language = "system", entry = "python3 scripts/check_commit_msg.py", pass_filenames = true, stages = ["commit-msg"] },
 ]
+# BEGIN hdsh adopt (managed by hdsh adopt apply)
+[[repos]]
+repo = "https://github.com/jukanntenn/harness-deepseek-harness"
+rev = "main"
+hooks = [
+  { id = "hdsh-pairing-verify", groups = ["hdsh"] },
+  { id = "hdsh-rfc-verify", groups = ["hdsh"] },
+  { id = "hdsh-rfc-archive", groups = ["hdsh"] },
+  { id = "hdsh-docs-wrap", groups = ["hdsh"] },
+  { id = "hdsh-docs-links", groups = ["hdsh"] },
+  { id = "hdsh-docs-budgets", groups = ["hdsh"] },
+  { id = "hdsh-adopt-verify", groups = ["hdsh"] },
+]
+# END hdsh adopt

@@ -1,0 +1,26 @@
+name: Issue policy
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled, ready_for_review, review_requested]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  policy:
+    name: Issue policy
+    runs-on: ubuntu-latest
+    steps:
+      # Fully qualified, never a relative path: a relative reference would
+      # load the action from the pull request's merge ref, letting a pull
+      # request modify its own validator.
+      - name: Validate the pull request
+        uses: jukanntenn/harness-deepseek-harness/.github/actions/issue-policy@main
+        with:
+          project-token: ${{ secrets.HDSH_ISSUE_PROJECT_TOKEN }}
+          hdsh-ref: main

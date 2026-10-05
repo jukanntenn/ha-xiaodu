@@ -2,6 +2,16 @@
 
 本文档为在本仓库工作的 AI 编程 Agent（Claude Code、Codex 等）提供协作规范。
 
+## Conventions
+
+文档与流程约定统一由 hdsh harness 承载，本文件只保留指针：
+
+- [文档标准](docs/AGENTS.md)——文档语料、命令清单与各文档门禁的归属。
+- [双语文档契约](docs/i18n/README.zh.md)——中英配对、翻译规则与术语表。
+- [RFC 规则](.agents/rfcs/README.zh.md)——决策记录的三元组结构与归档流程。
+- 任何变更先开 issue，PR 以 `Fixes #NN` 关联；决策类改动在同一条 PR 内携带 RFC。
+- 工作流技能位于 `.agents/skills/`（documenting、editing-prose、merging-stacked-prs、translating-docs、trimming-cot-leakage、pushing、archiving-rfcs、reviewing、finding-simplifications）。
+
 ## 项目结构
 
 - `custom_components/xiaodu/` — 集成源码
@@ -23,7 +33,7 @@ prek install                           # 安装 git 钩子（每个 clone 一次
 prek run --all-files                   # 全量门控（与 CI lint job 完全一致；push 前必须跑一次）
 prek run --group format --files <f>    # 只跑格式化组（与 AI 编辑后钩子一致）
 prek run --group lint --all-files      # 只跑 lint 组（与 AI 停止前钩子一致）
-prek run --group check --all-files     # 只跑测试（与 CI tests job / pre-push 钩子一致）
+prek run --group check --group hdsh --all-files  # 只跑测试 + hdsh 门禁（与 CI tests job 一致）
 uv run pytest tests/test_light.py      # 运行单个测试文件
 uv run basedpyright --writebaseline    # baseline 漂移时重生成基线（与代码改动同笔提交）
 uv run ty check custom_components      # 类型检查（辅助二次校验，advisory）
@@ -34,6 +44,11 @@ prek update                            # 升级钩子版本（遵循 cooldown_da
 - ruff 版本唯一 pin 在 `pyproject.toml`（dev 依赖），prek 钩子经 `uv run ruff` 调用，无双 pin 漂移。
 - `prek install` 需显式 `--hook-type pre-commit --hook-type pre-push --hook-type commit-msg`（prek 0.4.11 的 `default_install_hook_types` 对 TOML 配置不生效，裸 install 只装 pre-commit）。push 时 pre-push 钩子自动跑测试（check 组）；跳过单个钩子用 `SKIP=<id>`，全部跳过 `git push --no-verify`（慎用，CI 仍会拦截）。
 - 工具类/辅助类脚本放在 `scripts/`，默认用 Python（跨平台），均已带 shebang 且可执行。
+- hdsh 托管钩子带 `hdsh` 组（双语配对、RFC、文档 wrap/链接/词数、adopt 校验）：过滤运行必须包含 `--group hdsh`，CI tests/release 与本地 pre-push 同为 `prek run --group check --group hdsh --all-files`；每个 worktree 一次 `hdsh worktree install`。
+
+<a id="run-relevant-checks-locally"></a>
+
+选择覆盖改动面的最窄检查在本地跑，全量预演交给 CI：改 Python 跑 `uv run ruff check <f>` 与对应平台测试文件；改文档先 `hdsh pairing list` 看配对状态、改完 `hdsh pairing record <anchor>`；门禁全集永远由 prek（本地）与 CI 兜底。
 
 ## 代码规范
 

@@ -1,0 +1,11 @@
+# zizmor 审计配置。
+#
+# unpinned-uses 豁免：hdsh adopt 生成的 issue-policy / issue-lifecycle 两个 workflow
+# 以 @main 引用 jukanntenn/harness-deepseek-harness 的复合 action（上游未发版，无 tag 可 pin；
+# workflow 字节归 hdsh adopt 所有，本地不得分叉修改）。上游发布带 tag 的版本后，
+# 删除本豁免并在上游侧改为 pin tag/SHA。
+rules:
+  unpinned-uses:
+    ignore:
+      - 'issue-policy.yml'
+      - 'issue-lifecycle.yml'
