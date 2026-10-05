@@ -1,0 +1,7 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob
+# hash of each side as of the last confirmed-consistent state. Both
+# languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   hdsh pairing record .agents/rfcs/implemented/bug-fix/2026-10-05-bemfa-state-reconciliation.md
+2026-10-05-bemfa-state-reconciliation.md: c31a5040958d85da84587dd05401585d68301890
+2026-10-05-bemfa-state-reconciliation.zh.md: c4e55f8dda6e4447ab08056db6ee50c25019ad7c

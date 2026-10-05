@@ -1,0 +1,62 @@
+# RFC: 以最后发布 payload 为基准对账巴法云设备状态
+
+Status: implemented
+
+[English](2026-10-05-bemfa-state-reconciliation.md) | 中文
+
+## Problem
+
+巴法云 topic 本应镜像集成所持有的状态——即 HA 实体展示的同一状态——但它没有。按既有设计，状态单向流动（[issue #37](https://github.com/jukanntenn/ha-xiaodu/issues/37)）：小度侧变更传播到 HA 与巴法云，**从不**反向同步小度。而在这条单向流内，HA 侧与巴法云侧已经漂移，且一旦漂移就无限期错下去。2026-10-05 浏览器三方实测，小度云本身已被排除出参照系（它不可靠——属性时间戳停摆数月——且 HA 日志有 89 次 `Connection timeout to xiaodu.baidu.com`，轮询失败窗口是常态而非例外）：
+
+- 4 盏灯在 HA 显示 `off`，巴法云 topic 却仍是 `on`，时间冻结在一至两天前；
+- 5 个空调 topic 自三周前创建起**从未携带任何状态**，而 HA 显示其中两台正在运行（`cool`）、三台关闭——初始状态处是一个空洞的镜像；
+- 1 盏灯在 HA 显示 `on`，其巴法云 topic（创建较早、昵称还是改名前的值）同样为空。
+
+发布管线只有一条路——「新轮询快照 ≠ 上一轮快照」才发布——而这条路会跳过一切它没亲眼看到的变化：
+
+- 启动后的首轮轮询什么都不发（该轮 `self.data` 为 `None`），停机期间、轮询失败期间、cookie 过期冻结期间变化过的状态永远得不到重放：下一次成功轮询比较的是两份相同的新快照。
+- 新映射到巴法云 topic 的设备没有上一份快照，初始状态永不发布。五个空调 topic 自创建起为空即由此而来。
+- MQTT 短暂断连时失败的发布返回 `False` 即被丢弃：无队列、无重试、重连后不补发。
+- 一个范围更窄的放大器：小度 cookie 失效后协调器停止调度轮询（`ConfigEntryAuthFailed`），MQTT 客户端却保持连接，巴法云侧于是冻结却看起来健康。
+
+净效果：巴法云是一个**没有对账机制的缓存**——任何漏掉的转换都是永久的，直到同一设备碰巧再次经由运行中的集成改变状态。
+
+## Decision
+
+状态发布幂等且自愈：以**最后成功发布的 payload** 为对账基准，取代对连续 API 快照做 diff。
+
+1. `DeviceMapping.last_published_payload` 记录最后到达 `{topic}/up` 的 payload。topic（重）建时归零——映射对象在新增与重试时整体重建——其余场合跨轮询存续。
+2. `BemfaDeviceSyncManager.update_device_state` 是唯一的对账点：编码状态；payload 等于 `last_published_payload` 时直接返回 `True`、不碰网络；否则发布到 `{topic}/up`，且**仅在发布成功时**记录 payload。MQTT 断连期间被丢弃的发布不写记录，下一轮轮询原样重试。返回值含义是「已一致或已发布」，不是「真的发了字节」——docstring 已写明。
+3. 协调器的 `_publish_state_changes`（新旧快照 diff）已删除。每轮成功轮询中，**在** `_handle_bemfa_sync` 建 topic 之后、**在**乐观锁改写之后，`_reconcile_bemfa_states` 对即将返回的最终数据中的每个设备调用 `update_device_state`——正是 HA 实体将要展示的值。改用锁后数据同时消除了一个现存缺陷：锁窗口内的并发轮询不再把过期的云端值闪断到 `apply_optimistic_state` 刚发布的乐观 payload 之上。未变化的设备每轮只花一次内存中的编码与比较；线上静默。
+4. 控制命令后的乐观发布路径汇入同一个 `update_device_state`，因此同样记录 payload。当乐观状态事后与协调器最终数据不一致时，下一轮轮询发布该数据、记录收敛——取代此前依赖「快照 diff + 5 秒实体锁」纠正错误乐观状态的做法。
+
+`BemfaMQTTClient` 零改动（无重连回调、无队列），下行命令路径、锁语义（锁继续只管 HA 实体的展示）与单向状态流均不变——**永远不向小度发布任何东西**。巴法云侧忠实镜像协调器的最终数据。
+
+### 各失败模式痊愈后的形态
+
+- **重启 / 轮询中断 / 轮询失败**：首轮成功轮询把每个已映射设备的当前状态各发布一次；此后记录让线上保持静默。对小度网络不稳的现实，频发的轮询失败窗口具备自愈能力。
+- **新设备**：`sync_devices` 在同一轮建好 topic，紧随其后的对账遍历发布其初始状态。
+- **发布被丢弃（MQTT 断连）**：记录保持为空，MQTT 恢复后的下一轮重新发布；一旦记录在案，不再重复发布。
+- **认证冻结窗口**：重新认证后的首轮成功轮询对账冻结期间的一切。冻结本身是 HA reauth 流程在按设计工作，有意不动。
+
+## Alternatives considered
+
+**仅在启动时全量发布，另加 MQTT 重连后重发。** 钩住「轮询器刚启动」与「MQTT 刚（重）连」两个事件，各推送一次全量状态。否决：需要从 paho 客户端向同步管理器穿一条新的重连回调；发布丢弃只在重连边界痊愈（最后一次重连之后被丢弃的发布要等下一次重启）；对百度网络不稳造成的常态化轮询失败窗口毫无作用；且保留了带三条跳过路径的脆弱快照 diff。按记录对账根本不需要事件——30 秒轮询本身就是重试循环。
+
+**在 `BemfaMQTTClient` 里做客户端发布队列。** broker 断连时排队能 payload、重连后冲刷。否决：它为轮询已经能重解决的问题引入了 paho 线程与事件循环之间的共享可变状态；而且队列会重放*中间* payload，对账只重放*当前* payload——后者才是巴法云控制台展示的全部。
+
+**保留快照 diff，为首轮开特例。** `old is None` 时发布、首轮去掉 `self.data` 守卫。否决，因为不够：只覆盖重启与新设备，MQTT 断连期间失败的发布照样丢失，轮询失败窗口期间的变化也抓不到（diff 只比较相邻两次*成功*快照），且留下三个互相配合的特例，而非一个幂等机制。
+
+**用锁前的 API 快照发布，而非最终数据。** 维持旧顺序（先发布、再锁改写）能携带最新的云端值，但在 5 秒锁窗口内会偏离 HA 实体的展示值，还可能用过期云端值中途覆盖刚发布的乐观 payload。否决：镜像目标是 HA 的展示状态，锁后数据正是它。
+
+## Testing
+
+- 同步管理器（接本地 broker、走真实 MQTT 线）：`test_update_device_state_dedupes_unchanged_payload` 钉住「payload 未变返回 `True` 且 `{topic}/up` 恰好一条消息」；`test_update_device_state_retries_after_failed_publish` 钉住「断连时发布被丢弃、`last_published_payload` 保持为空，broker 恢复后同一状态被原样补发」；`test_update_device_state_unmapped_returns_false` 钉住「未映射设备每轮返回 `False` 且无副作用」。
+- 协调器：`test_first_refresh_reconciles_all_devices` 钉住 issue #37 的核心回归——重启后首轮成功刷新（无 `self.data`）对每个设备恰好发布一次；`test_reconcile_publishes_post_lock_data` 钉住「乐观锁窗口内的轮询发布锁定状态、绝不发布过期云端值」；`test_reconcile_bemfa_states_bemfa_error` 钉住「发布路径抛异常时逐设备记日志并吞掉」。
+
+## Consequences
+
+- 巴法云控制台在任意重启、轮询中断或 MQTT 断线之后的首轮成功轮询即收敛到 HA 的展示值，且一致时保持静默。issue #37 的 4 盏停留 `on` 的灯与 5 个空调空 topic 是最直接的动机案例。
+- 每次重启后的首轮每设备一条消息（issue #37 账户为 24 条）——都是发给已连接 broker 的小 QoS-1 消息；巴法云真正要紧的限制（禁 QoS-2、topic 数量）不受影响。
+- 镜像保真度受协调器数据约束：巴法云忠实镜像 HA 的展示值，包括小度云报错的状态（两台实际运行而云端 `off` 的空调会镜像为运行中）。这正是单向状态流决策的按设计结果——为巴法云单独臆造一份「真值」反而会让本决策要对齐的两侧分道扬镳。
+- `update_device_state` 对「已一致、无需发布」返回 `True` 是一次调用方语义变化；没有任何调用方把返回值当「真的发了字节」用，docstring 已写明新含义。
