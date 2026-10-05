@@ -1,0 +1,94 @@
+{
+  "hdshVersion": "0.1.0",
+  "hdshRef": "main",
+  "files": {
+    ".agents/rfcs/AGENTS.md": "e7ea779db00bb1e639971d1af1a234f9e96accee491461dc57dc78369deaf4c9",
+    ".agents/rfcs/README.md": "1d4e0ab0ac9baf529458ff145c691317e21780559ad9d48e1c59d27aede9749b",
+    ".agents/rfcs/README.zh.md": "62e5bd315ac5e48db404cfdfea83158423ef68a62cf176eeb2bb1928d0672c68",
+    ".agents/rfcs/archived/AGENTS.md": "df4501f2b6132b46e7d4ac66a3cd9b9fc1e8d5671dccda2e77348d706be7b89e",
+    ".agents/rfcs/archived/manifest.json": "a60477c75697e970a7828b56ae9a9b148b74cb342e21d276e0bbf762efe08e3e",
+    ".agents/rfcs/implemented/AGENTS.md": "8ef222071a944588047678aa9b500a650c467f8990aae8b5b0039c8d5d970aeb",
+    ".agents/rfcs/implemented/feature/2026-09-08-user-account-issue-policy.md": "1408a958cc3de444ce35eb2b9c11294140a9fe5a5e105d1d989655af2faa4b97",
+    ".agents/rfcs/implemented/feature/2026-09-08-user-account-issue-policy.zh.md": "018e3e015b228a82015a14ced249ba6fd7640fba1c064a89ec35bb5f6a564d4d",
+    ".agents/rfcs/implemented/process/2026-09-07-bilingual-pairing-gate.md": "c34dbb2ffaf3a9181d01940499b71b9301d69ba8ed99b75a1349aa75b4ee3a79",
+    ".agents/rfcs/implemented/process/2026-09-07-bilingual-pairing-gate.zh.md": "a3e52fbfa35d1ba52d23e4c64452406a64765e016da1fae715a88f6e5fc68afc",
+    ".agents/rfcs/implemented/process/2026-09-07-briefed-minimal-translation-updates.md": "f6fb21a0ed1026d674bb89331b883abee1da614e71dc017d5ed2456cf3670ca7",
+    ".agents/rfcs/implemented/process/2026-09-07-briefed-minimal-translation-updates.zh.md": "d930be7c991df2115e7157c8c916ce3a6685c486c8e10a4c528335807bef24d2",
+    ".agents/rfcs/implemented/process/2026-09-07-document-corpus-gates.md": "2c41550e0979926b7eca51331a0d16b92dd6f9f9e7cf2b12fe684ca6bc00f517",
+    ".agents/rfcs/implemented/process/2026-09-07-document-corpus-gates.zh.md": "d58e5fb16ece5325856dff54f83ec00ec6885a885c7a0d26454c1d7467dbec13",
+    ".agents/rfcs/implemented/process/2026-09-07-github-workflow.md": "566861e49c3325e3073057d19d56526fdc9c7a5527059ab39a28c60c0842aef6",
+    ".agents/rfcs/implemented/process/2026-09-07-github-workflow.zh.md": "4baf9e5fe3643f89bac66a8a8525d07711a91137be090651db7ce20dc9e3d43a",
+    ".agents/rfcs/implemented/process/2026-09-07-local-git-workflow.md": "232e3bff5fd5b981e537b74a47548989e2e62605e0cfb12d174d8c07abcc5ad1",
+    ".agents/rfcs/implemented/process/2026-09-07-local-git-workflow.zh.md": "e22853eceb1f74b3dc3cff6a9d3eb35d3d429e508d599e29fd4cf6166f9d128e",
+    ".agents/rfcs/implemented/process/2026-10-05-adopting-the-hdsh-harness.md": "1b9933402c4884729859d15c7124e914a7299cd2afe63b7131ae22505ce69eab",
+    ".agents/rfcs/implemented/process/2026-10-05-adopting-the-hdsh-harness.zh.md": "8fc00ca6321dc20fe2fdb2866c9dabd9640a18d3ae80002ac0c6e793a81fe0e1",
+    ".agents/skills/documenting/SKILL.md": "14d3a6f48143060ed8e92094888444f4cd8903122109058b959e0bbe71240a5d",
+    ".agents/skills/editing-prose/SKILL.md": "e0c9ddb447d0d3798bb1c4a21b2b1ab58bceb31ee4b077b6c7114bf2334a13c7",
+    ".agents/skills/editing-prose/references/examples.md": "45557418703e337cf0a1025ce3c598dbc041e3e7a8219a0c616c46f4f2f1bad8",
+    ".agents/skills/merging-stacked-prs/SKILL.md": "65a2d01bdb5aa6e92f72cd9377f6a20aee4b12db611692a684587239cb325326",
+    ".agents/skills/translating-docs/SKILL.md": "b78cc94311f5cec9c21f9fdba68fba128b579ad41374ae1c533a0f05bc5db034",
+    ".agents/skills/trimming-cot-leakage/SKILL.md": "5cd951688d16c8edf64819efc2859d10cf8a05b7090c923c1907f8eeb9e516f9",
+    ".agents/skills/trimming-cot-leakage/references/examples.md": "9e1afa7163e26b1c5fe8781ce6eab11389a914d35c0dfa68fd8653bb0701f658",
+    ".agents/skills/trimming-cot-leakage/references/recall-batteries.md": "9c119b14cd75b209270f46375da17078dfbc77e3a683921dfd73e1ca50d28ac0",
+    ".github/ISSUE_TEMPLATE/bug.md": "92d5772ae76361a99031de46c399e707a79d3ad71e17410566bdbfad8408c005",
+    ".github/ISSUE_TEMPLATE/config.yml": "8b09e7df09fc7534371988062769ee427af2954a02c04c763e8a8005be0f2be4",
+    ".github/ISSUE_TEMPLATE/feature.md": "f955f90c13de184e709eeb2213206e7bef68607646c4584ca8aa130463ae894a",
+    ".github/ISSUE_TEMPLATE/idea.md": "ff9d42f94c7a3deb8e37816f0ca5845b83f38e9e5486519dddac338c508b8d8a",
+    ".github/ISSUE_TEMPLATE/research.md": "b6396c5a2c6feea69d9f007a365e56a7bfa505a42c02207bb0d37dbada4cbe02",
+    ".github/ISSUE_TEMPLATE/task.md": "a69dea2c2a98d88c777c40f86336d7bcdba6e5d257f27a4979edddc702152cb3",
+    ".github/actionlint.yaml": "7b4168ddf7d78ffae22a6fe62641033dd5e4602456577f4bd55ce3d93bd5ceca",
+    ".github/pull_request_template.md": "577bf689d244434b1c04a0bc9b57d4b229444bddcfe3679b954ea10079e70a22",
+    ".github/workflows/issue-lifecycle.yml": "e413f2c54cf3831b7ff6a3277f59303d77a825a97476d9b946ea26405c329fe4",
+    ".github/workflows/issue-policy.yml": "efe015dc3e29ddf8bc3a14676456f777fcb59f5744e8e8af42564da9f0b7edf7",
+    "docs/AGENTS.md": "f998187db269765d2cf6811740f2e004d72d23b9f5ab54d42c71f64b7fd9af0c",
+    "docs/cookbook/responding-to-pr-review-on-a-stack.md": "7f32f4e4362da0c18d737bbe9aae22e60c7a6222999894f2ea18e11c5a45a9b8",
+    "docs/cookbook/responding-to-pr-review-on-a-stack.zh.md": "70f3185e17f9ba21a4440c80c5ca8a6d6e1f9eb03d312e6ba7a4162c56421127",
+    "docs/i18n/README.md": "954622a0c7df7a241681defd2a2e1f64dcfbc4644d7769909e7e6e3813452be7",
+    "docs/i18n/README.zh.md": "55047fada18f33d1187fb5331d9007455fdf00ec5c0934d145c305f84a05201c",
+    "docs/i18n/style-samples.md": "507ac3bca5cdfb76adb71cfac7a05488952ea0cccbb841c636ff374b883e2bdd",
+    "docs/i18n/terminology.md": "1005303f1f2b02cfcf5edd2c4d434a1da28fed53cabea74d8f419d7f36478fd9",
+    "docs/i18n/translation-rules.md": "eac627d8f40495c74faf15d5bcabdadc7ed547ff180945ef18bf4467f6950381",
+    "docs/i18n/translation-rules.zh.md": "e7c575cc2bfb47ae1c141a6c27771ea52bc20bc38efcc2c3706620c1be808252"
+  },
+  "editable": [
+    "docs/architecture.md",
+    "docs/architecture.zh.md",
+    "docs/development.md",
+    "docs/development.zh.md"
+  ],
+  "pendingMerges": [
+    "AGENTS.md"
+  ],
+  "consumerConfig": [
+    ".github/issue-management/config.json",
+    ".hdsh/docs.manifest.json",
+    ".hdsh/pairing.manifest.json"
+  ],
+  "slotTemplates": [
+    ".agents/skills/archiving-rfcs/SKILL.md",
+    ".agents/skills/finding-simplifications/SKILL.md",
+    ".agents/skills/pushing/SKILL.md",
+    ".agents/skills/reviewing/SKILL.md"
+  ],
+  "projectAnchor": 1,
+  "slotGuidance": {
+    ".agents/skills/archiving-rfcs/SKILL.md": {
+      "archive-tests": "7e5b7c9a635c7bae11d9b4478457e62610aed660b2b4b0b9fd68b3640fe94ae3"
+    },
+    ".agents/skills/finding-simplifications/SKILL.md": {
+      "production-corpus": "23e4393899b1a4d1091ca957e0b8150e565455002d492db5dc652d00ddc4ee35"
+    },
+    ".agents/skills/pushing/SKILL.md": {
+      "coverage": "316c6658822260f9fc9c75510682e9918b81e13d93b6235836008b11ac9f50eb",
+      "focused-tests": "f9291027f0e89423b4a05359f6113e5e441969e596cfedcaf060e8d678f2bf4c",
+      "full-suite": "b056e5cae0289a7df62eb229c14b03a6b9398d9a0d60b5a651f83c2b576ee962",
+      "hooks": "8c5981f1e117faf7bdac3ae74963eb34051f197f7c0b704c2e25730ebf49454e",
+      "packaging-smoke": "97f4e4191bed1d1de23a31b19da0710c504219c52450bfe9970d0bdb34a8d646",
+      "style-check": "1976215742f1d67e10c0981cf34dafb162f319ddddde8ece40bad03275985f68",
+      "type-check": "c669a43a0cf6c735e1299027a7c2875b6156bb6ecb93b9ec0b52eae0a3f64c55"
+    },
+    ".agents/skills/reviewing/SKILL.md": {
+      "entry-path": "5cf8ef6b8f8ef840ddaa80fa04fa00b8f678e16614e538c677ee99136937f4fb"
+    }
+  }
+}

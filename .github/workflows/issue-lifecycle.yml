@@ -1,0 +1,49 @@
+name: Issue lifecycle
+
+on:
+  issues:
+    types:
+      - opened
+      - edited
+      - assigned
+      - unassigned
+      - labeled
+      - unlabeled
+      - closed
+      - reopened
+      - field_added
+      - field_removed
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+      - labeled
+      - unlabeled
+      - review_requested
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: issue-lifecycle-${{ github.event.issue.number || github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  lifecycle:
+    name: Issue lifecycle
+    runs-on: ubuntu-latest
+    steps:
+      # Fully qualified, never a relative path: a relative reference would
+      # load the action from the pull request's merge ref, letting a pull
+      # request modify its own validator.
+      - name: Handle the repository event
+        uses: jukanntenn/harness-deepseek-harness/.github/actions/issue-lifecycle@main
+        with:
+          project-token: ${{ secrets.HDSH_ISSUE_PROJECT_TOKEN }}
+          hdsh-ref: main

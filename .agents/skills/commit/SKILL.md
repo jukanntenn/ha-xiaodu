@@ -16,8 +16,7 @@ description: Use when 用户要求提交或暂存改动（commit/stage/save/subm
 
 ## 消息格式
 
-`<type>: <desc>`：小写、祈使语气、无句号；中文文件用中文、英文文件用英文。
-类型只用 `feat`/`fix`/`docs`/`refactor`/`test`/`ci`/`chore`，本仓库不使用 scope。
+`<type>: <desc>`：小写、祈使语气、无句号；中文文件用中文、英文文件用英文。类型只用 `feat`/`fix`/`docs`/`refactor`/`test`/`ci`/`chore`，本仓库不使用 scope。
 
 ## 边界情形
 

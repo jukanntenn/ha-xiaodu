@@ -1,0 +1,10 @@
+# actionlint 1.7.12 does not know the `issues.field_added` and
+# `issues.field_removed` activity types GitHub documents for the `issues`
+# event (https://docs.github.com/en/actions/reference/events-that-trigger-workflows#issue)
+# and the lifecycle workflow registers. Remove this filter once a pinned
+# actionlint release knows both types; until then CI and live workflow runs
+# cover the rest of the file.
+paths:
+  .github/workflows/issue-lifecycle.yml:
+    ignore:
+      - 'invalid activity type "field_(added|removed)"'

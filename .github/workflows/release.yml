@@ -31,7 +31,7 @@ jobs:
           cache: false
           install-only: true
       # 测试不通过不发布：与 CI tests.yml（latest）及本地 pre-push 同一条命令。
-      - run: prek run --group check --all-files
+      - run: prek run --group check --group hdsh --all-files
 
   release:
     name: Create release with zip asset

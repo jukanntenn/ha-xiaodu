@@ -1,0 +1,8 @@
+{
+  "docBudgets": {
+    "docs/architecture.md": 400,
+    "docs/architecture.zh.md": 250,
+    "docs/development.md": 300,
+    "docs/development.zh.md": 200
+  }
+}
