@@ -65,6 +65,14 @@ class BemfaMQTTClient:
                 _LOGGER.exception("Failed to start Bemfa MQTT client")
                 self._client = None
                 return False
+        elif self._connected:
+            # 已连接（含 paho 自动重连刚完成的情形）直接返回。不能无条件
+            # wait：event 可能残留上一次连接的 set 状态（paho 尚未处理到
+            # EOF，_on_disconnect 还没清），wait 会瞬间消费过期信号，随后
+            # 才观察到 flag 已翻 False，返回过期的 False。
+            return True
+        # 到这里 flag=False；_on_disconnect 先清 event 再翻 flag，故 event
+        # 必已清空，本次等待只可能被新的 CONNACK 唤醒。
         await asyncio.to_thread(self._connect_event.wait, timeout_seconds)
         if not self._connected:
             _LOGGER.warning(
@@ -86,8 +94,8 @@ class BemfaMQTTClient:
         _ = self._client.disconnect()
         _ = self._client.loop_stop()
         self._client = None
-        self._connected = False
         self._connect_event.clear()
+        self._connected = False
 
     def subscribe(self, topic: str, qos: int = 1) -> None:
         """记录订阅并在已连接时实际订阅。"""
@@ -152,8 +160,11 @@ class BemfaMQTTClient:
         properties: Any,
     ) -> None:
         _LOGGER.info("Disconnected from Bemfa MQTT broker: %s", reason_code)
-        self._connected = False
+        # 先清 event 再翻 flag：保证「event 已 set ⟹ flag 为 True」恒成立。
+        # 顺序颠倒会出现 flag=False 而 event 仍 set 的中间态，被并发等待的
+        # async_connect 观测到后立即返回过期的 False（重连被误判为不可达）。
         self._connect_event.clear()
+        self._connected = False
 
     def _on_message(
         self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage

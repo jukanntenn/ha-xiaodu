@@ -104,6 +104,9 @@ async def test_mqtt_downlink_controls_device_and_reports_state(
     coordinator = entry.runtime_data
     mapping = coordinator.bemfa_sync_manager.device_mapping["appliance_test_light_001"]
     assert mapping.bemfa_topic is not None
+    # setup 返回只保证 SUBSCRIBE 已入队；等 broker 登记完订阅再下发，
+    # 否则下行消息会在订阅生效前被路由丢弃。
+    await bemfa_mqtt_broker.wait_for_subscription(TEST_BEMFA_UID, mapping.bemfa_topic)
 
     aioclient_mock.mock_calls.clear()
     bemfa_mqtt_probe.send(mapping.bemfa_topic, "on#80")
