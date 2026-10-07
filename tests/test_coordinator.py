@@ -579,18 +579,18 @@ async def test_handle_bemfa_sync_without_manager(
     await coordinator._handle_bemfa_sync([])
 
 
-async def test_publish_state_changes_without_manager(
+async def test_reconcile_bemfa_states_without_manager(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     aioclient_mock_fixture: None,
 ) -> None:
-    """未启用 Bemfa 时状态发布直接返回。"""
+    """未启用 Bemfa 时对账发布直接返回。"""
     mock_config_entry.add_to_hass(hass)
     assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
     await hass.async_block_till_done()
 
     coordinator = mock_config_entry.runtime_data
-    await coordinator._publish_state_changes({})
+    await coordinator._reconcile_bemfa_states({})
 
 
 def _device(appliance_id: str = "appliance_test_light_001") -> Device:
@@ -614,22 +614,76 @@ def _bemfa_coordinator(
     return XiaoduCoordinator(hass, mock_config_entry, api_client, sync_manager)
 
 
-async def test_publish_state_changes_bemfa_error(
+async def test_reconcile_bemfa_states_bemfa_error(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     aioclient_mock_fixture: None,
 ) -> None:
-    """Bemfa 状态发布抛异常时仅记日志不抛出。"""
+    """Bemfa 对账发布抛异常时仅记日志不抛出。"""
     sync_manager = AsyncMock()
     sync_manager.update_device_state.side_effect = RuntimeError("boom")
     coordinator = _bemfa_coordinator(hass, mock_config_entry, sync_manager)
-    old_device = _device()
-    new_device = _device()
-    new_device.state_setting["turnOnState"]["value"] = "on"
-    coordinator.data = {"appliance_test_light_001": old_device}
+    coordinator.data = {"appliance_test_light_001": _device()}
 
-    await coordinator._publish_state_changes({"appliance_test_light_001": new_device})
+    await coordinator._reconcile_bemfa_states({"appliance_test_light_001": _device()})
     sync_manager.update_device_state.assert_awaited_once()
+
+
+async def test_first_refresh_reconciles_all_devices(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock_fixture: None,
+) -> None:
+    """重启后首轮刷新（self.data 为 None）即对账发布全部设备。
+
+    这是 issue #37 的核心回归：首轮不再跳过状态发布，巴法云上的
+    存量/初始状态在第一轮成功轮询内补齐。
+    """
+    sync_manager = AsyncMock()
+    coordinator = _bemfa_coordinator(hass, mock_config_entry, sync_manager)
+    assert coordinator.data is None
+
+    data = await coordinator._async_update_data()
+
+    assert data
+    reconciled_ids = {
+        call.args[0] for call in sync_manager.update_device_state.await_args_list
+    }
+    assert reconciled_ids == set(data.keys())
+
+
+async def test_reconcile_publishes_post_lock_data(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    aioclient_mock_fixture: None,
+) -> None:
+    """锁窗口内的并发轮询不得用过期云端值覆盖乐观状态。
+
+    发布基准是锁改写后的最终数据（即 HA 实体展示值），与
+    apply_optimistic_state 刚发布的乐观 payload 一致——线上静默。
+    """
+    sync_manager = AsyncMock()
+    coordinator = _bemfa_coordinator(hass, mock_config_entry, sync_manager)
+    coordinator.data = {"appliance_test_light_001": _device()}
+
+    # 乐观开灯（锁 5 秒）并立即发布 on
+    await coordinator.apply_optimistic_state(
+        "appliance_test_light_001", {"turnOnState": "on"}
+    )
+    await coordinator.async_cancel_background_tasks()
+    sync_manager.update_device_state.reset_mock()
+
+    # 锁窗口内轮询：云端仍报 off（HTTP 走 aioclient_mock_fixture 的固定响应）
+    await coordinator._async_update_data()
+
+    states = [
+        call.args[1]
+        for call in sync_manager.update_device_state.await_args_list
+        if call.args[0] == "appliance_test_light_001"
+    ]
+    assert states
+    for state in states:
+        assert state["turnOnState"]["value"] == "on"
 
 
 async def test_handle_bemfa_command_empty(

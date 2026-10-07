@@ -71,6 +71,9 @@ class DeviceMapping:
     last_sync_time: float = field(default_factory=time.time)
     sync_status: str = "pending"
     sync_error: str | None = None
+    # 最后成功发布到 {topic}/up 的 payload；topic（重）建时随映射重建归零。
+    # 对账基准：与当前编码一致则跳过发布，发布失败不记录以便下轮重试。
+    last_published_payload: str | None = None
 
 
 class BemfaDeviceSyncManager:
@@ -523,14 +526,20 @@ class BemfaDeviceSyncManager:
         _LOGGER.info("Removed Bemfa device: %s", appliance_id)
 
     async def update_device_state(self, appliance_id: str, state: dict) -> bool:
-        """更新巴法云上的设备状态。
+        """对账式发布设备状态到巴法云（幂等）。
+
+        以 ``last_published_payload`` 为基准：当前编码与最后成功发布的
+        payload 一致时直接返回 True（零网络开销）；不一致才发布到
+        ``{topic}/up``，且仅在发布成功时记录——MQTT 断连时被丢弃的
+        发布不记录，下一轮轮询原样重试。
 
         Args:
             appliance_id: 小度 appliance ID。
-            state: 新的状态字典。
+            state: 状态字典。
 
         Returns:
-            发布成功返回 True；未映射/未连接/无法编码返回 False。
+            已一致（无需发布）或发布成功返回 True；未映射/无法编码/
+            发布失败返回 False。
         """
         mapping = self._device_mapping.get(appliance_id)
         if not mapping or not mapping.bemfa_topic or not mapping.device_type:
@@ -538,10 +547,13 @@ class BemfaDeviceSyncManager:
         payload = encode_state(mapping.device_type, state)
         if payload is None:
             return False
+        if payload == mapping.last_published_payload:
+            return True
         published = await asyncio.to_thread(
             self._mqtt_client.publish, f"{mapping.bemfa_topic}/up", payload
         )
         if published:
+            mapping.last_published_payload = payload
             mapping.last_sync_time = time.time()
             mapping.sync_status = "synced"
         return published

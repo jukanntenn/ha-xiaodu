@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import copy
 from typing import TYPE_CHECKING, Any
@@ -299,6 +300,83 @@ async def test_update_device_state_returns_false_when_not_connected(
         await manager.update_device_state(
             "appliance_test_light_001",
             {"turnOnState": {"value": "ON"}},
+        )
+        is False
+    )
+
+
+async def test_update_device_state_dedupes_unchanged_payload(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    bemfa_mqtt_broker: MqttBrokerHandle,
+    bemfa_mqtt_probe: MqttProbe,
+) -> None:
+    """payload 与最后成功发布一致时跳过发布（零网络开销）。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    manager = _manager_with_broker(hass, bemfa_mqtt_broker)
+    await manager._mqtt_client.async_connect(timeout_seconds=2.0)
+    await manager.sync_devices([_device()], {})
+    mapping = manager.device_mapping["appliance_test_light_001"]
+    state = {"turnOnState": {"value": "ON"}, "brightness": {"value": 80}}
+
+    assert await manager.update_device_state("appliance_test_light_001", state) is True
+    _topic, payload = await bemfa_mqtt_probe.wait_for(
+        lambda t, p: t == f"{mapping.bemfa_topic}/up"
+    )
+    assert payload == "on#80"
+    assert mapping.last_published_payload == "on#80"
+
+    # 相同状态再次对账 → 返回 True 但不产生第二条消息
+    assert await manager.update_device_state("appliance_test_light_001", state) is True
+    await asyncio.sleep(0.3)
+    up_messages = [
+        1 for t, _ in bemfa_mqtt_probe._received if t == f"{mapping.bemfa_topic}/up"
+    ]
+    assert len(up_messages) == 1
+    manager._mqtt_client.disconnect()
+
+
+async def test_update_device_state_retries_after_failed_publish(
+    hass: HomeAssistant,
+    aioclient_mock: AiohttpClientMocker,
+    bemfa_mqtt_broker: MqttBrokerHandle,
+    bemfa_mqtt_probe: MqttProbe,
+) -> None:
+    """MQTT 断连时发布被丢弃且不记录；重连后同一状态自动补发。"""
+    aioclient_mock.post(BEMFA_CREATE_TOPIC_V1_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_ROOM_URL, json={"code": 0})
+    aioclient_mock.post(BEMFA_CHANGE_GROUP_URL, json={"code": 0})
+    manager = _manager(hass)
+    await manager.sync_devices([_device()], {})
+    mapping = manager.device_mapping["appliance_test_light_001"]
+    state = {"turnOnState": {"value": "ON"}}
+
+    # 断连 → 发布失败，记录保持为空（下一轮轮询才会重试）
+    assert await manager.update_device_state("appliance_test_light_001", state) is False
+    assert mapping.last_published_payload is None
+
+    # 接上 broker 重连 → 同一状态重试成功并记录
+    manager._mqtt_client._host = bemfa_mqtt_broker.host
+    manager._mqtt_client._port = bemfa_mqtt_broker.port
+    manager._mqtt_client._use_tls = False
+    await manager._mqtt_client.async_connect(timeout_seconds=2.0)
+    assert await manager.update_device_state("appliance_test_light_001", state) is True
+    assert mapping.last_published_payload == "on"
+    _topic, payload = await bemfa_mqtt_probe.wait_for(
+        lambda t, p: t == f"{mapping.bemfa_topic}/up"
+    )
+    assert payload == "on"
+    manager._mqtt_client.disconnect()
+
+
+async def test_update_device_state_unmapped_returns_false(hass: HomeAssistant) -> None:
+    """未映射/未建 topic 的设备每轮返回 False 且无副作用（重试无害）。"""
+    manager = _manager(hass)
+    assert (
+        await manager.update_device_state(
+            "not_mapped", {"turnOnState": {"value": "ON"}}
         )
         is False
     )
