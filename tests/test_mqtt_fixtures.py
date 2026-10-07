@@ -30,12 +30,8 @@ async def test_broker_restart_reconnects_probe(
 ) -> None:
     """broker 重启后探针 paho 自动重连并恢复订阅。"""
     await bemfa_mqtt_broker.restart()
-    import asyncio
-
-    deadline = asyncio.get_running_loop().time() + 5
-    while asyncio.get_running_loop().time() < deadline:
-        if bemfa_mqtt_broker.sessions >= 1:
-            break
-        await asyncio.sleep(0.05)
+    # 重连完成的判据是订阅恢复登记（隐含会话已建立），只等会话数会在
+    # SUBSCRIBE 尚未处理完时抢跑 publish，消息路由给空。
+    await bemfa_mqtt_broker.wait_for_subscription("mqtt-probe", "#")
     bemfa_mqtt_probe.send("smoke/after-restart", "on")
     await bemfa_mqtt_probe.wait_for(lambda t, p: t == "smoke/after-restart")

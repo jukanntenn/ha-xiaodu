@@ -280,6 +280,26 @@ class MqttBrokerHandle:
         """当前 broker 上的会话数（探针 + 被测客户端）。"""
         return len(self._broker._sessions)
 
+    async def wait_for_subscription(
+        self, client_id: str, topic_filter: str, timeout_seconds: float = 10.0
+    ) -> None:
+        """轮询 broker 订阅表，直至 client_id 在 topic_filter 上的订阅登记完成。
+
+        paho 的 subscribe() 只是把 SUBSCRIBE 包塞进发送队列，broker 处理完
+        是异步的；不等登记就 publish，消息只会路由给既有订阅者，被测客户端
+        永远收不到，表现为 10s 等待超时的"假失败"（CI 负载下必现窗口）。
+        """
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_seconds
+        while loop.time() < deadline:
+            for session, _qos in self._broker._subscriptions.get(topic_filter, []):
+                if session.client_id == client_id:
+                    return
+            await asyncio.sleep(0.02)
+        raise AssertionError(
+            f"{client_id} 未在 {timeout_seconds}s 内完成对 {topic_filter} 的订阅"
+        )
+
     async def restart(self) -> None:
         """在同一端口重启 broker（验证客户端自动重连）。"""
         await shutdown_broker_gracefully(self._broker, reclaim_port=True)
@@ -384,6 +404,9 @@ async def bemfa_mqtt_probe(
     # 收不到消息的"假失败"（见 test_mqtt_client 的时序抖动）。
     if not await asyncio.to_thread(connected.wait, 10):
         raise AssertionError("MQTT probe 未能在 10s 内连上本地 broker")
+    # CONNACK 只代表连接建立；# 订阅登记完成前探针收不到任何消息，
+    # 在此统一等待，让所有用例拿到 probe 即具备完整的收发能力。
+    await bemfa_mqtt_broker.wait_for_subscription("mqtt-probe", "#")
     probe = MqttProbe(client, received)
     yield probe
     # paho 的 disconnect()/loop_stop() 是同步阻塞调用。直接在 event loop 线程
